@@ -10,6 +10,7 @@
 
 ## 주요 기능
 
+- **Multi-provider**: Ollama, LM Studio, vLLM, llama.cpp, LocalAI, text-generation-webui, Jan.ai, GPT4All
 - Ollama API를 통한 모델 자동 검색
 - 임베딩 모델 필터링 (nomic-bert 등)
 - `/api/show`를 통한 정확한 컨텍스트 길이 (fallback 포함)
@@ -53,8 +54,9 @@
 
 | Flag | Description |
 |------|-------------|
-| `-l, --local URL` | Local Ollama URL |
+| `-l, --local URL` | Local server URL |
 | `-r, --remote URL` | Remote URL (repeatable) |
+| `-p, --provider NAME` | Provider: ollama, lmstudio, vllm, llama-cpp, localai, tgwui, jan, gpt4all | auto |
 | `-o, --output FILE` | Output (`-` for stdout) |
 | `-n, --dry-run` | Preview |
 | `-i, --interactive` | Interactive selection |

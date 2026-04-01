@@ -10,6 +10,7 @@ Genera `opencode.json` para [OpenCode](https://opencode.ai) a partir de los mode
 
 ## Características
 
+- **Multi-provider**: Ollama, LM Studio, vLLM, llama.cpp, LocalAI, text-generation-webui, Jan.ai, GPT4All
 - Descubrimiento automático de modelos vía API de Ollama
 - Filtrado de modelos de embedding (nomic-bert, etc.)
 - Longitudes de contexto exactas vía `/api/show` (con fallback)
@@ -53,8 +54,9 @@ Genera `opencode.json` para [OpenCode](https://opencode.ai) a partir de los mode
 
 | Flag | Description |
 |------|-------------|
-| `-l, --local URL` | Local Ollama URL |
+| `-l, --local URL` | Local server URL |
 | `-r, --remote URL` | Remote URL (repeatable) |
+| `-p, --provider NAME` | Provider: ollama, lmstudio, vllm, llama-cpp, localai, tgwui, jan, gpt4all | auto |
 | `-o, --output FILE` | Output (`-` for stdout) |
 | `-n, --dry-run` | Preview |
 | `-i, --interactive` | Interactive selection |

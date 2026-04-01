@@ -8,10 +8,12 @@
 
 ## Возможности
 
-- Автоматическое обнаружение моделей через API Ollama
-- Фильтрация embedding-моделей (nomic-bert и др.)
-- Точные контекстные окна через `/api/show` с кэшированием
-- Несколько удалённых серверов Ollama
+- **Поддержка нескольких провайдеров**: Ollama, LM Studio, vLLM, llama.cpp, LocalAI, text-generation-webui, Jan.ai, GPT4All
+- Автоопределение провайдера по порту или указание через `-p`
+- Автоматическое обнаружение моделей через API провайдера
+- Фильтрация embedding-моделей (nomic-bert, LM Studio type field и др.)
+- Точные контекстные окна (Ollama `/api/show`, llama.cpp `/props`, LM Studio rich metadata)
+- Несколько серверов разных провайдеров одновременно
 - Интерактивный выбор моделей с опцией «Все»
 - Фильтрация по glob-паттернам (include/exclude)
 - Автоопределение small_model (для генерации заголовков)
@@ -130,9 +132,10 @@
 
 | Флаг | Описание | По умолчанию |
 |------|----------|--------------|
-| `-l, --local URL` | URL локального Ollama | `$OLLAMA_HOST` или `http://localhost:11434` |
+| `-l, --local URL` | URL локального сервера | `$OLLAMA_HOST` или `http://localhost:11434` |
 | `-r, --remote URL` | URL удалённого сервера (можно указать несколько) | нет |
-| `-o, --output FILE` | Путь к выходному файлу | `opencode.json` |
+| `-p, --provider NAME` | Провайдер: ollama, lmstudio, vllm, llama-cpp, localai, tgwui, jan, gpt4all | авто |
+| `-o, --output FILE` | Путь к выходному файлу (`-` для stdout) | `opencode.json` |
 | `-n, --dry-run` | Вывести в stdout, не записывать файл | выкл |
 | `-i, --interactive` | Интерактивный выбор моделей | выкл |
 | `--include PAT` | Включить модели по glob-паттерну (можно несколько) | все |

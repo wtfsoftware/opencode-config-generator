@@ -71,25 +71,20 @@ ollama pull llama3.2
 opencode_config_generator/
 ├── .github/workflows/test.yml         CI pipeline
 ├── .gitignore
-├── generate_opencode_config.sh        Bash script (primary)
-├── Generate-OpenCodeConfig.ps1        PowerShell script (Windows)
+├── generate_opencode_config.sh        Main script (Bash + Python)
+├── Generate-OpenCodeConfig.ps1        PowerShell version
 ├── install.sh                         One-line installer
-├── smoke_test.sh                      Automated smoke tests
+├── smoke_test.sh                      15 automated tests
 ├── generate_opencode_config.completion.bash  Bash completion
 ├── _generate_opencode_config          Zsh completion
-├── README.md                          English documentation
-├── README.ru.md                       Russian
-├── README.fr.md                       French
-├── README.de.md                       German
-├── README.es.md                       Spanish
-├── README.zh.md                       Chinese
-├── README.ja.md                       Japanese
-├── README.pt.md                       Portuguese
-├── README.it.md                       Italian
-├── README.ko.md                       Korean
-├── README.ar.md                       Arabic
-├── README.nl.md                       Dutch
-├── README.ua.md                       Ukrainian
+├── adapters/                          Provider adapters
+│   ├── base.sh                        Factory, auto-detect, registry
+│   ├── ollama.sh                      Ollama adapter
+│   ├── lmstudio.sh                    LM Studio adapter
+│   ├── llama_cpp.sh                   llama.cpp adapter
+│   └── openai_generic.sh              Generic OpenAI adapter (vllm, localai, etc.)
+├── README.md                          English
+├── README.ru.md / .fr.md / .de.md / .es.md / .zh.md / .ja.md / .pt.md / .it.md / .ko.md / .ar.md / .nl.md / .ua.md
 ├── SPECIFICATION.md                   Technical specification
 ├── DEVELOPMENT.md                     This file
 ├── LICENSE                            MIT License

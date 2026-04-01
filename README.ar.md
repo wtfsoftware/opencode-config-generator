@@ -10,6 +10,7 @@
 
 ## الميزات
 
+- **Multi-provider**: Ollama, LM Studio, vLLM, llama.cpp, LocalAI, text-generation-webui, Jan.ai, GPT4All
 - اكتشاف النماذج تلقائيًا عبر واجهة برمجة التطبيقات Ollama
 - تصفية نماذج التضمين (nomic-bert وغيرها)
 - أطوال السياق الدقيقة عبر `/api/show` (مع احتياطي)
@@ -53,8 +54,9 @@
 
 | Flag | Description |
 |------|-------------|
-| `-l, --local URL` | Local Ollama URL |
+| `-l, --local URL` | Local server URL |
 | `-r, --remote URL` | Remote URL (repeatable) |
+| `-p, --provider NAME` | Provider: ollama, lmstudio, vllm, llama-cpp, localai, tgwui, jan, gpt4all | auto |
 | `-o, --output FILE` | Output (`-` for stdout) |
 | `-n, --dry-run` | Preview |
 | `-i, --interactive` | Interactive selection |

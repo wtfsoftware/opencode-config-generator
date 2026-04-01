@@ -10,21 +10,23 @@
 
 ## 1. Overview
 
-OpenCode Config Generator is a cross-platform tool that auto-generates `opencode.json` configuration for [OpenCode](https://opencode.ai) by discovering models from one or more Ollama servers via their REST API.
+OpenCode Config Generator is a cross-platform tool that auto-generates `opencode.json` configuration for [OpenCode](https://opencode.ai) by discovering models from one or more local inference servers (Ollama, LM Studio, vLLM, llama.cpp, and others) via their REST APIs.
 
 ### 1.1 Goals
 
 - Zero-config generation: run once, get a working config
-- Multi-server support: combine local and remote Ollama instances
+- Multi-provider support: Ollama, LM Studio, vLLM, llama.cpp, LocalAI, text-generation-webui, Jan.ai, GPT4All
+- Multi-server support: combine servers of different providers
+- Auto-detection: identify provider by port
 - Accurate metadata: fetch exact context lengths from API
 - Safe defaults: exclude embedding models, cap output tokens
 - User control: interactive selection, include/exclude filters, merge mode
 
 ### 1.2 Non-goals
 
-- Managing Ollama server lifecycle (start/stop/download)
+- Managing server lifecycle (start/stop/download)
 - Model performance benchmarking
-- Configuration of non-Ollama providers
+- Configuration of cloud providers (use OpenCode's built-in support)
 
 ---
 
@@ -33,64 +35,90 @@ OpenCode Config Generator is a cross-platform tool that auto-generates `opencode
 ### 2.1 Components
 
 ```
-┌─────────────────────────────────────────────────┐
-│                  Bash / PowerShell               │
-│                                                  │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
-│  │ CLI Args  │  │ Dep Check│  │ URL Validate  │  │
-│  └────┬─────┘  └────┬─────┘  └───────┬───────┘  │
-│       │              │                │           │
-│       ▼              ▼                ▼           │
-│  ┌──────────────────────────────────────────┐    │
-│  │           process_server()               │    │
-│  │  ┌─────────┐ ┌──────────┐ ┌───────────┐  │    │
-│  │  │ /api/tags│ │ /api/show│ │ Interactive│  │    │
-│  │  │  fetch   │ │  (batch) │ │  Select   │  │    │
-│  │  └─────────┘ └──────────┘ └───────────┘  │    │
-│  └──────────────────┬───────────────────────┘    │
-│                     │                             │
-│                     ▼                             │
-│  ┌──────────────────────────────────────────┐    │
-│  │          generate_config() [Python]       │    │
-│  │  ┌──────────┐ ┌──────┐ ┌──────────────┐  │    │
-│  │  │ Embed    │ │ Dedup│ │ Context      │  │    │
-│  │  │ Filter   │ │ +Sfx │ │ Assignment   │  │    │
-│  │  └──────────┘ └──────┘ └──────────────┘  │    │
-│  │  ┌──────────┐ ┌──────┐ ┌──────────────┐  │    │
-│  │  │ Merge    │ │Model │ │ JSON Output  │  │    │
-│  │  │ Config   │ │Select│ │ + Validate   │  │    │
-│  │  └──────────┘ └──────┘ └──────────────┘  │    │
-│  └──────────────────────────────────────────┘    │
-│                     │                             │
-│                     ▼                             │
-│              opencode.json                        │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                    generate_opencode_config.sh        │
+├──────────────────────────────────────────────────────┤
+│  CLI args → detect_provider() → load_adapter()       │
+│                      ↓                                │
+│  ┌────────────────────────────────────────────┐      │
+│  │            adapters/base.sh                 │      │
+│  │   (factory, auto-detect, registry)          │      │
+│  └─────┬──────────┬──────────┬─────────┬──────┘      │
+│        ▼          ▼          ▼         ▼              │
+│  ┌──────────┐ ┌─────────┐ ┌───────┐ ┌─────────┐     │
+│  │ ollama   │ │lmstudio │ │llama  │ │ openai  │     │
+│  │ .sh      │ │.sh      │ │_cpp   │ │_generic │     │
+│  │          │ │         │ │.sh    │ │.sh      │     │
+│  │/api/tags │ │/v1/models│ │/props │ │/v1/models│    │
+│  │/api/show │ │/api/v1/ │ │       │ │(vllm,   │     │
+│  │          │ │models   │ │       │ │localai, │     │
+│  │          │ │         │ │       │ │tgwui...)│     │
+│  └─────┬────┘ └────┬────┘ └───┬───┘ └────┬────┘     │
+│        └───────────┴──────────┴──────────┘           │
+│                         ↓                             │
+│  ┌──────────────────────────────────────────────┐    │
+│  │          generate_config() [Python]            │    │
+│  │  ┌──────────┐ ┌──────┐ ┌──────────────┐      │    │
+│  │  │ Embed    │ │ Dedup│ │ Provider     │      │    │
+│  │  │ Filter   │ │ +Sfx │ │ Builder      │      │    │
+│  │  └──────────┘ └──────┘ └──────────────┘      │    │
+│  │  ┌──────────┐ ┌──────┐ ┌──────────────┐      │    │
+│  │  │ Merge    │ │Model │ │ JSON Output  │      │    │
+│  │  │ Config   │ │Select│ │ + Validate   │      │    │
+│  │  └──────────┘ └──────┘ └──────────────┘      │    │
+│  └──────────────────────────────────────────────┘    │
+│                         ↓                             │
+│                   opencode.json                       │
+└──────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Data Flow
+### 2.2 Adapter Interface
+
+All adapters implement:
+
+| Function | Description | Returns |
+|----------|-------------|---------|
+| `adapter_fetch_models URL` | Fetch model list | JSON array |
+| `adapter_get_context URL MODEL` | Get context length | Integer or empty |
+| `adapter_has_rich_metadata` | Has detailed metadata? | bool |
+| `adapter_provider_name` | Display name | string |
+| `adapter_npm_package` | npm package for config | string |
+
+### 2.3 Data Flow
 
 ```
-Ollama Server(s) → /api/tags → Filter → /api/show → Dedup+Suffix → Config → File
+Server URL → detect_provider() → load_adapter() → adapter_fetch_models()
+    → adapter_get_context() → filter + dedup → generate_config() → opencode.json
 ```
 
-### 2.3 Files
+### 2.4 Files
 
 | File | Platform | Engine | Size |
 |------|----------|--------|------|
-| `generate_opencode_config.sh` | Linux/macOS/WSL/Git Bash | Bash + Python3 | ~35KB |
+| `generate_opencode_config.sh` | Linux/macOS/WSL/Git Bash | Bash + Python3 | ~36KB |
 | `Generate-OpenCodeConfig.ps1` | Windows | PowerShell | ~20KB |
-| `opencode.json` | Generated output | JSON | ~2-10KB |
+| `adapters/base.sh` | Both | Bash | ~4KB |
+| `adapters/ollama.sh` | Both | Bash | ~2KB |
+| `adapters/lmstudio.sh` | Both | Bash | ~3KB |
+| `adapters/llama_cpp.sh` | Both | Bash | ~2KB |
+| `adapters/openai_generic.sh` | Both | Bash | ~2KB |
 
 ---
 
-## 3. Ollama API Integration
+## 3. Provider API Integration
 
-### 3.1 Endpoints Used
+### 3.1 Endpoints by Provider
 
-| Endpoint | Method | Purpose | Response |
-|----------|--------|---------|----------|
-| `/api/tags` | GET | List all models | `{models: [{name, details, ...}]}` |
-| `/api/show` | POST | Get model metadata | `{model_info: {*.context_length}, details, ...}` |
+| Provider | Models Endpoint | Context Endpoint | Embed Filter |
+|----------|-----------------|------------------|:------------:|
+| **Ollama** | `GET /api/tags` | `POST /api/show` (exact) | ✅ families |
+| **LM Studio** | `GET /v1/models` + `GET /api/v1/models` | inline in rich response | ✅ type field |
+| **vLLM** | `GET /v1/models` | — | ❌ |
+| **llama.cpp** | `GET /v1/models` | `GET /props` | ❌ |
+| **LocalAI** | `GET /v1/models` | — | ❌ |
+| **text-generation-webui** | `GET /v1/models` | — | ❌ |
+| **Jan.ai** | `GET /v1/models` | — | ❌ |
+| **GPT4All** | `GET /v1/models` | — | ❌ |
 
 ### 3.2 Model Detection
 

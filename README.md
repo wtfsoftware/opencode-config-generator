@@ -10,10 +10,12 @@ English | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch]
 
 ## Features
 
-- Auto-discovers all models from Ollama API
-- Filters out embedding models (nomic-bert, etc.)
-- Fetches exact context lengths via `/api/show` (with hardcoded fallback)
-- Supports multiple remote Ollama servers
+- **Multi-provider support**: Ollama, LM Studio, vLLM, llama.cpp, LocalAI, text-generation-webui, Jan.ai, GPT4All
+- Auto-detects provider by port, or specify with `-p`
+- Auto-discovers all models via provider API
+- Filters out embedding models (nomic-bert, LM Studio type field, etc.)
+- Fetches exact context lengths (Ollama `/api/show`, llama.cpp `/props`, LM Studio rich metadata)
+- Supports multiple servers of different providers simultaneously
 - Interactive model selection (with "All models" option)
 - Include/exclude models by glob patterns
 - Auto-detects `small_model` (smallest non-embed model for title generation)
@@ -118,9 +120,10 @@ English | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch]
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-l, --local URL` | Local Ollama URL | `$OLLAMA_HOST` or `http://localhost:11434` |
-| `-r, --remote URL` | Remote Ollama URL (repeatable) | none |
-| `-o, --output FILE` | Output file path | `opencode.json` |
+| `-l, --local URL` | Local server URL | `$OLLAMA_HOST` or `http://localhost:11434` |
+| `-r, --remote URL` | Remote server URL (repeatable) | none |
+| `-p, --provider NAME` | Provider: ollama, lmstudio, vllm, llama-cpp, localai, tgwui, jan, gpt4all | auto-detect |
+| `-o, --output FILE` | Output file path (`-` for stdout) | `opencode.json` |
 | `-n, --dry-run` | Print to stdout, don't write | off |
 | `-i, --interactive` | Interactive model selection | off |
 | `--include PATTERN` | Include models matching glob (repeatable) | all |
@@ -237,6 +240,44 @@ Embedding models are **excluded by default** because they don't support chat/too
 - Model names containing these keywords
 
 Use `--with-embed` / `-WithEmbed` to include them.
+
+## Multi-Provider Support
+
+Works with 8 local inference providers. Provider is auto-detected by port, or specify with `-p`.
+
+| Provider | Default Port | Rich Metadata | Auto-detect |
+|----------|:------------:|:-------------:|:-----------:|
+| **Ollama** | 11434 | `/api/show` (context, families) | ✅ |
+| **LM Studio** | 1234 | `/api/v1/models` (type, capabilities, context) | ✅ |
+| **vLLM** | 8000 | basic only | ✅ |
+| **llama.cpp** | 8080 | `/props` (context_size) | ✅ (as localai) |
+| **LocalAI** | 8080 | basic only | ✅ |
+| **text-generation-webui** | 5000 | basic only | ✅ |
+| **Jan.ai** | 1337 | basic only | ✅ |
+| **GPT4All** | 4891 | basic only | ✅ |
+
+```bash
+# Auto-detect by port
+./generate_opencode_config.sh -l http://localhost:1234       # LM Studio
+./generate_opencode_config.sh -l http://localhost:8000       # vLLM
+
+# Explicit provider
+./generate_opencode_config.sh -l http://localhost:8080 -p llama-cpp
+
+# Ollama + LM Studio together
+./generate_opencode_config.sh -l http://localhost:11434 -r http://localhost:1234 -p lmstudio
+```
+
+Each provider appears as a separate block in `opencode.json`:
+
+```json
+{
+  "provider": {
+    "ollama": { "name": "Ollama", "options": { "baseURL": "http://localhost:11434/v1" }, ... },
+    "lmstudio": { "name": "LM Studio", "options": { "baseURL": "http://localhost:1234/v1" }, ... }
+  }
+}
+```
 
 ## Context Lookup Cache
 
