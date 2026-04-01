@@ -1,23 +1,25 @@
-# OpenCode Ollama 配置生成器
+# OpenCode 配置生成器（Ollama）
 
-为 [OpenCode](https://opencode.ai) 自动生成 `opencode.json` 配置文件，基于本地和远程 Ollama 服务器的模型。
+从本地和远程 Ollama 服务器生成 `opencode.json` 配置。
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [English](README.md) | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | 中文 | [日本語](README.ja.md) | [Português](README.pt.md) | [Italiano](README.it.md) | [한국어](README.ko.md) | [العربية](README.ar.md) | [Nederlands](README.nl.md) | [Українська](README.ua.md)
 
----
+**v1.1.0** | [规范文档](SPECIFICATION.md) | [开发文档](DEVELOPMENT.md) | [免责声明](DISCLAIMER.md)
 
 ## 功能特性
 
-- 通过 Ollama API 自动发现所有模型
-- 过滤 embedding 模型（nomic-bert 等）
-- 通过 `/api/show` 获取精确的上下文长度（带回退默认值）
-- 支持多个远程 Ollama 服务器
-- 交互式模型选择（含「全部」选项）
+- **多提供商支持**：Ollama、LM Studio、vLLM、llama.cpp、LocalAI、text-generation-webui、Jan.ai、GPT4All
+- 根据端口自动检测提供商，或使用 `-p` 指定
+- 通过提供商 API 自动发现所有模型
+- 过滤 embedding 模型（nomic-bert、LM Studio type 字段等）
+- 获取精确的上下文长度（Ollama `/api/show`、llama.cpp `/props`、LM Studio 丰富元数据）
+- 同时支持多个不同提供商的服务器
+- 交互式模型选择（含「全部模型」选项）
 - 基于 glob 模式的 include/exclude 过滤
-- 自动检测 small_model（用于标题生成）
-- 预览模式（dry-run）
-- 重复模型的服务器后缀处理
-- 与现有配置合并（merge）
+- 自动检测 `small_model`（最小的非 embed 模型，用于标题生成）
+- 预览模式（dry-run，不写入文件）
 - 支持 `OLLAMA_HOST` 环境变量
 
 ## 要求
@@ -43,10 +45,10 @@
 ### Bash
 
 ```bash
-# 仅本地 Ollama
+# 仅本地 Ollama（使用 $OLLAMA_HOST 或 http://localhost:11434）
 ./generate_opencode_config.sh
 
-# 使用远程服务器
+# 使用一个远程服务器
 ./generate_opencode_config.sh -r http://192.168.1.100:11434
 
 # 使用多个远程服务器
@@ -67,23 +69,23 @@
 # 预览不写入文件
 ./generate_opencode_config.sh -n
 
-# 添加 num_ctx（用于 tool calling）
+# 添加 num_ctx 到 provider options（用于 tool calling）
 ./generate_opencode_config.sh --num-ctx 32768
 
 # 显式设置默认模型
 ./generate_opencode_config.sh --default-model qwen2.5-coder:7b
 
-# 合并到现有配置
+# 合并到现有配置（更新模型，保留其他设置）
 ./generate_opencode_config.sh --merge
 
-# 禁用上下文查找缓存
+# 跳过 /api/show 调用（更快，使用硬编码的上下文限制）
 ./generate_opencode_config.sh --no-context-lookup
+
+# 禁用上下文查找缓存
+./generate_opencode_config.sh --no-cache
 
 # 写入全局配置
 ./generate_opencode_config.sh -o ~/.config/opencode/opencode.json
-
-# 查看版本
-./generate_opencode_config.sh --version
 ```
 
 ### PowerShell
@@ -94,18 +96,22 @@
 
 # 使用远程服务器
 .\Generate-OpenCodeConfig.ps1 -RemoteOllamaUrl "http://192.168.1.100:11434"
+.\Generate-OpenCodeConfig.ps1 -RemoteOllamaUrl "http://gpu1:11434","http://gpu2:11434"
 
 # 交互式选择
 .\Generate-OpenCodeConfig.ps1 -Interactive
 
+# 仅 qwen 模型
+.\Generate-OpenCodeConfig.ps1 -Include "qwen*"
+
 # 预览
 .\Generate-OpenCodeConfig.ps1 -DryRun
 
-# 合并
-.\Generate-OpenCodeConfig.ps1 -Merge
+# 使用 num_ctx
+.\Generate-OpenCodeConfig.ps1 -NumCtx 32768
 
-# 版本
-.\Generate-OpenCodeConfig.ps1 -Version
+# 写入全局配置
+.\Generate-OpenCodeConfig.ps1 -OutputFile "$env:USERPROFILE\.config\opencode\opencode.json"
 ```
 
 ## CLI 参考
@@ -114,36 +120,58 @@
 
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
-| `-l, --local URL` | 本地 Ollama URL | `$OLLAMA_HOST` 或 `http://localhost:11434` |
-| `-r, --remote URL` | 远程 Ollama URL（可多次指定） | 无 |
-| `-o, --output FILE` | 输出文件路径 | `opencode.json` |
+| `-l, --local URL` | 本地服务器 URL | `$OLLAMA_HOST` 或 `http://localhost:11434` |
+| `-r, --remote URL` | 远程服务器 URL（可多次指定） | 无 |
+| `-p, --provider NAME` | 提供商：ollama, lmstudio, vllm, llama-cpp, localai, tgwui, jan, gpt4all | 自动检测 |
+| `-o, --output FILE` | 输出文件路径（`-` 表示 stdout） | `opencode.json` |
 | `-n, --dry-run` | 输出到 stdout，不写入文件 | 关 |
 | `-i, --interactive` | 交互式模型选择 | 关 |
-| `--include PAT` | 包含匹配 glob 的模型（可多次指定） | 全部 |
-| `--exclude PAT` | 排除匹配 glob 的模型（可多次指定） | 无 |
+| `--include PATTERN` | 包含匹配 glob 的模型（可多次指定） | 全部 |
+| `--exclude PATTERN` | 排除匹配 glob 的模型（可多次指定） | 无 |
 | `--with-embed` | 包含 embedding 模型 | 排除 |
-| `--no-context-lookup` | 跳过 `/api/show`，使用硬编码值 | 关 |
-| `--num-ctx N` | `num_ctx` 值，0 表示省略 | `0` |
-| `--merge` | 合并到现有配置 | 关 |
+| `--no-context-lookup` | 跳过 `/api/show`，使用硬编码限制 | 关 |
+| `--num-ctx N` | provider options 的 `num_ctx`，0 表示省略 | `0` |
+| `--merge` | 合并到现有配置（仅更新模型） | 关 |
 | `--default-model ID` | 显式设置默认模型 | 自动 |
-| `--small-model ID` | 显式设置 small 模型 | 自动 |
-| `--no-cache` | 禁用上下文缓存 | 关 |
+| `--small-model ID` | 显式设置 small 模型（用于标题生成） | 自动 |
+| `--no-cache` | 禁用上下文查找缓存 | 关 |
 | `-v, --version` | 显示版本 | |
 | `-h, --help` | 显示帮助 | |
+
+### PowerShell
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `-LocalOllamaUrl` | 本地 Ollama URL | `$OLLAMA_HOST` 或 `http://localhost:11434` |
+| `-RemoteOllamaUrl` | 远程 URL（数组） | 无 |
+| `-OutputFile` | 输出文件路径 | `opencode.json` |
+| `-DryRun` | 输出到 stdout，不写入文件 | 关 |
+| `-Interactive` | 交互式模型选择 | 关 |
+| `-Include` | 包含模式（通配符，数组） | 全部 |
+| `-Exclude` | 排除模式（通配符，数组） | 无 |
+| `-WithEmbed` | 包含 embedding 模型 | 排除 |
+| `-NoContextLookup` | 跳过 `/api/show`，使用硬编码限制 | 关 |
+| `-NumCtx` | provider options 的 `num_ctx`，0 表示省略 | `0` |
+| `-Merge` | 合并到现有配置（仅更新模型） | 关 |
+| `-DefaultModel` | 显式设置默认模型 | 自动 |
+| `-SmallModel` | 显式设置 small 模型（用于标题生成） | 自动 |
+| `-NoCache` | 禁用上下文查找缓存 | 关 |
+| `-Version` | 显示版本 | |
+| `-Help` | 显示帮助 | |
 
 ## 工作原理
 
 1. 通过 `GET /api/tags` 从每个 Ollama 服务器获取模型列表
-2. 根据 `families` 字段过滤 embedding 模型
-3. 按 include/exclude 模式过滤
-4. 通过 `POST /api/show` 获取上下文长度（并行，带缓存）
-5. 多服务器重复模型处理（添加 `@host:port` 后缀）
-6. 交互式选择（如果使用 `-i`）
-7. 合并现有配置（如果使用 `--merge`）
-8. 自动检测 small_model（最小的非 embed 模型）
-9. 生成 `opencode.json`
+2. 根据 `families` 字段过滤 embedding 模型（`nomic-bert`、`bert` 等）
+3. 按 include/exclude 模式过滤（glob 匹配）
+4. 通过 `POST /api/show` 获取每个模型的上下文长度（并行，带缓存）
+5. 去重多个服务器上的相同模型（保留第一个服务器的版本）
+6. 交互式选择（如果使用 `-i`）：带编号列表和 `[0] 全部模型` 选项
+7. 合并（如果使用 `--merge`）：保留现有配置设置和其他提供商
+8. 自动检测 `small_model`：按参数量选择最小的非 embed 模型
+9. 生成包含 Ollama 作为提供商的 `opencode.json`
 
-## 配置示例
+## 生成的配置结构
 
 ```json
 {
@@ -156,50 +184,130 @@
         "baseURL": "http://localhost:11434/v1"
       },
       "models": {
-        "qwen2.5-coder:7b": {
-          "name": "Qwen2 7.6B Q4_K_M (local)",
+        "llama3.2:latest": {
+          "name": "Llama 3.6B Q4_K_M (local)",
           "limit": {
-            "context": 32768,
+            "context": 131072,
             "output": 16384
           }
         }
       }
     }
   },
-  "model": "ollama/qwen2.5-coder:7b",
+  "model": "ollama/llama3.2:latest",
   "small_model": "ollama/qwen2.5-coder:3b"
 }
 ```
 
-## 去重处理
+### 字段说明
 
-当同一模型存在于多个服务器上时，每个副本会获得唯一的带服务器后缀的名称：
+| 字段 | 说明 |
+|------|------|
+| `provider.ollama.options.baseURL` | Ollama OpenAI 兼容端点 |
+| `provider.ollama.models.*.limit.context` | 模型的最大上下文窗口 |
+| `provider.ollama.models.*.limit.output` | 最大输出 token（上限 16K） |
+| `model` | 默认模型（第一个可用的） |
+| `small_model` | 用于轻量任务的最小模型（标题生成） |
 
+## 模型上下文检测
+
+上下文长度按以下优先级确定：
+
+1. **API 查找** — `POST /api/show` 返回 `model_info.*.context_length`（精确值）
+2. **硬编码回退** — 按模型系列估算：
+
+| 系列 | 默认上下文 |
+|------|:---------:|
+| qwen, qwen2 | 32,768 |
+| llama | 8,192 |
+| mistral, mixtral | 32,768 |
+| deepseek | 65,536 |
+| command, command-r | 131,072 |
+| yi | 200,000 |
+| gemma | 8,192 |
+| phi | 4,096 |
+| codestral | 32,768 |
+| granite | 8,192 |
+| other | 8,192 |
+
+使用 `--no-context-lookup` 跳过 API 调用，仅使用硬编码值（更快）。
+
+## Embedding 模型
+
+Embedding 模型**默认被排除**，因为它们不支持 chat/tool calling。检测依据：
+
+- 模型系列包含 `nomic-bert`、`bert`、`bert-moe`、`embed`、`embedding`
+- 模型名称包含这些关键词
+
+使用 `--with-embed` / `-WithEmbed` 来包含它们。
+
+## 多提供商支持
+
+支持 8 种本地推理提供商。提供商根据端口自动检测，或使用 `-p` 指定。
+
+| 提供商 | 默认端口 | 丰富元数据 | 自动检测 |
+|--------|:-------:|:---------:|:-------:|
+| **Ollama** | 11434 | `/api/show`（上下文、系列） | ✅ |
+| **LM Studio** | 1234 | `/api/v1/models`（类型、能力、上下文） | ✅ |
+| **vLLM** | 8000 | 仅基础信息 | ✅ |
+| **llama.cpp** | 8080 | `/props`（context_size） | ✅（作为 localai） |
+| **LocalAI** | 8080 | 仅基础信息 | ✅ |
+| **text-generation-webui** | 5000 | 仅基础信息 | ✅ |
+| **Jan.ai** | 1337 | 仅基础信息 | ✅ |
+| **GPT4All** | 4891 | 仅基础信息 | ✅ |
+
+```bash
+# 根据端口自动检测
+./generate_opencode_config.sh -l http://localhost:1234       # LM Studio
+./generate_opencode_config.sh -l http://localhost:8000       # vLLM
+
+# 显式指定提供商
+./generate_opencode_config.sh -l http://localhost:8080 -p llama-cpp
+
+# Ollama + LM Studio 一起使用
+./generate_opencode_config.sh -l http://localhost:11434 -r http://localhost:1234 -p lmstudio
 ```
-qwen2.5-coder:7b                → 本地服务器（原始名称）
-qwen2.5-coder:7b@gpu-server     → 第一个远程服务器
-qwen2.5-coder:7b@gpu-server-2   → 同主机的第二个远程服务器
+
+每个提供商在 `opencode.json` 中作为独立的块出现：
+
+```json
+{
+  "provider": {
+    "ollama": { "name": "Ollama", "options": { "baseURL": "http://localhost:11434/v1" }, ... },
+    "lmstudio": { "name": "LM Studio", "options": { "baseURL": "http://localhost:1234/v1" }, ... }
+  }
+}
 ```
 
-两个版本都出现在 OpenCode 的 `/models` 中。
+## 上下文查找缓存
 
-## 上下文缓存
-
-来自 `/api/show` 的上下文长度缓存在 `~/.cache/opencode-generator/`，按 URL 哈希存储。缓存 24 小时后过期。使用 `--no-cache` 禁用。
+来自 `/api/show` 的上下文长度缓存在 `~/.cache/opencode-generator/`，按 URL 哈希存储。缓存 24 小时后过期。后续运行复用缓存值，仅获取新模型。使用 `--no-cache` 禁用。
 
 ## 合并模式
 
-使用 `--merge` 更新现有配置中的模型，保留其他设置（自定义 provider、规则等）：
+使用 `--merge` 更新现有 `opencode.json` 中的模型，而不覆盖其他设置（自定义提供商、主题、规则等）：
 
 ```bash
 # 初始生成
 ./generate_opencode_config.sh -o opencode.json
 
-# 手动添加 provider、规则等
+# 手动添加自定义提供商、规则等
 
-# 之后：仅更新模型
+# 之后：仅更新模型，保留其他所有内容
 ./generate_opencode_config.sh --merge -o opencode.json
 ```
+
+## 去重处理
+
+如果同一模型存在于多个服务器上，每个副本会获得带服务器后缀的唯一名称：
+
+```
+qwen2.5-coder:7b                → 本地服务器（原始名称）
+qwen2.5-coder:7b@gpu-server     → 第一个远程服务器
+qwen2.5-coder:7b@gpu-server-2   → 同主机名的第二个远程服务器
+```
+
+两个版本都出现在 `/models` 中。摘要会显示哪些模型被添加了后缀。
 
 ## 环境变量
 
@@ -207,6 +315,16 @@ qwen2.5-coder:7b@gpu-server-2   → 同主机的第二个远程服务器
 |------|------|
 | `OLLAMA_HOST` | 本地 Ollama URL（Ollama 标准变量） |
 | `XDG_CACHE_HOME` | 缓存目录基础路径 |
+
+## 安装生成的配置
+
+```bash
+# 全局配置（所有项目）
+cp opencode.json ~/.config/opencode/opencode.json
+
+# 项目特定
+cp opencode.json /path/to/project/opencode.json
+```
 
 ## 故障排除
 
@@ -225,11 +343,23 @@ sudo apt install python3
 # macOS
 brew install python3
 
-# Windows: https://python.org/downloads
+# Windows: 从 https://python.org 下载
 ```
 
 ### 上下文长度不正确
 
 - 脚本默认使用 `/api/show` 获取精确值
-- 如果 API 较慢，使用 `--no-context-lookup`
+- 如果 API 较慢，使用 `--no-context-lookup` 使用硬编码估算值
 - 可在生成的 JSON 中手动覆盖
+
+### Embedding 模型被意外包含/排除
+
+- 检查 `ollama show <model>` 输出中的 families
+- 使用 `--with-embed` 强制包含
+- 使用 `--exclude "*embed*"` 按名称强制排除
+
+### OpenCode 中出现 "Provider returned error"
+
+- 部分 Ollama 模型不支持 tool calling — 尝试 `qwen2.5-coder` 或 `llama3.2`
+- 如果 tools 失败，增加 `num_ctx`：`--num-ctx 32768`
+- 确保模型已加载：`ollama run <model>`
