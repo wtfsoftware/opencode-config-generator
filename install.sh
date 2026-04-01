@@ -37,9 +37,23 @@ TARGET="$INSTALL_DIR/$SCRIPT_NAME"
 if [[ -f "./$SCRIPT_NAME" ]]; then
     info "Installing from local ./$SCRIPT_NAME"
     cp "./$SCRIPT_NAME" "$TARGET"
+    # Copy adapters directory
+    if [[ -d "./adapters" ]]; then
+        ADAPTERS_DIR="$INSTALL_DIR/adapters"
+        mkdir -p "$ADAPTERS_DIR"
+        cp ./adapters/*.sh "$ADAPTERS_DIR/"
+        info "Adapters installed to: $ADAPTERS_DIR"
+    fi
 else
     info "Downloading from $REPO_URL/$SCRIPT_NAME"
     curl -fsSL "$REPO_URL/$SCRIPT_NAME" -o "$TARGET" || error "Download failed"
+    # Download adapters
+    ADAPTERS_DIR="$INSTALL_DIR/adapters"
+    mkdir -p "$ADAPTERS_DIR"
+    for adapter in base.sh ollama.sh lmstudio.sh llama_cpp.sh openai_generic.sh; do
+        curl -fsSL "$REPO_URL/adapters/$adapter" -o "$ADAPTERS_DIR/$adapter" 2>/dev/null || true
+    done
+    info "Adapters installed to: $ADAPTERS_DIR"
 fi
 
 chmod +x "$TARGET"

@@ -21,6 +21,8 @@ CACHE_TTL=86400  # 24 hours in seconds
 
 LOCAL_URL="$DEFAULT_OLLAMA"
 REMOTE_URLS=()
+LOCAL_PROVIDER=""
+REMOTE_PROVIDERS=()
 OUTPUT_FILE="$DEFAULT_OUTPUT"
 NUM_CTX="$DEFAULT_NUM_CTX"
 DRY_RUN=false
@@ -62,9 +64,10 @@ Usage: generate_opencode_config.sh [OPTIONS]
 Generates opencode.json configuration from Ollama models.
 
 OPTIONS:
-    -l, --local URL          Local Ollama URL
-                               Default: $OLLAMA_HOST or http://localhost:11434
-    -r, --remote URL         Remote Ollama server URL (can be specified multiple times)
+    -l, --local URL          Local server URL (default: $OLLAMA_HOST or http://localhost:11434)
+    -r, --remote URL         Remote server URL (can be specified multiple times)
+    -p, --provider NAME      Provider: ollama|lmstudio|vllm|llama-cpp|localai|tgwui|jan|gpt4all
+                               (auto-detected by port if not specified)
     -o, --output FILE        Output file path (default: opencode.json, - for stdout)
     -n, --dry-run            Print config to stdout, do not write file
     -i, --interactive        Interactive model selection
@@ -105,8 +108,17 @@ EXAMPLES:
     # Custom num_ctx for tool calling support (adds to provider options)
     generate_opencode_config.sh --num-ctx 32768
 
+    # LM Studio (auto-detected by port 1234)
+    generate_opencode_config.sh -l http://localhost:1234
+
+    # vLLM with explicit provider
+    generate_opencode_config.sh -l http://localhost:8000 -p vllm
+
+    # Ollama + LM Studio together
+    generate_opencode_config.sh -l http://localhost:11434 -r http://localhost:1234 -p lmstudio
+
 ENVIRONMENT VARIABLES:
-    OLLAMA_HOST              Default local Ollama URL
+    OLLAMA_HOST              Default local Ollama URL (used when provider is ollama)
 EOF
     exit 0
 }
@@ -126,6 +138,17 @@ parse_args() {
             -r|--remote)
                 [[ -n "${2:-}" ]] || { log_error "--remote requires a URL"; exit 1; }
                 REMOTE_URLS+=("$2")
+                shift 2
+                ;;
+            -p|--provider)
+                [[ -n "${2:-}" ]] || { log_error "--provider requires a name"; exit 1; }
+                # If local is set and remote not yet, this is local provider
+                # Otherwise it's for the last remote
+                if [[ ${#REMOTE_URLS[@]} -eq 0 ]]; then
+                    LOCAL_PROVIDER="$2"
+                else
+                    REMOTE_PROVIDERS+=("$2")
+                fi
                 shift 2
                 ;;
             -o|--output)
@@ -809,6 +832,12 @@ else:
 
 # --- Build provider config ---
 
+PROVIDER_DISPLAY = {
+    "ollama": "Ollama", "lmstudio": "LM Studio", "vllm": "vLLM",
+    "llama-cpp": "llama.cpp", "localai": "LocalAI", "tgwui": "text-generation-webui",
+    "jan": "Jan.ai", "gpt4all": "GPT4All", "openai-generic": "OpenAI-compatible",
+}
+
 def make_options(url):
     opts = {"baseURL": f"{url}/v1"}
     if num_ctx > 0:
@@ -818,33 +847,40 @@ def make_options(url):
 clean = lambda m: {k: v for k, v in m.items() if k != "_info"}
 provider_config = OrderedDict()
 
-if len(servers) == 1:
-    provider_config["ollama"] = {
+# Group servers by provider type
+provider_groups = OrderedDict()
+for idx, server in enumerate(servers):
+    prov = server.get("provider", "ollama")
+    if prov not in provider_groups:
+        provider_groups[prov] = []
+    provider_groups[prov].append((idx, server))
+
+# Build one provider per provider type (combined models from same provider type)
+for prov, server_list in provider_groups.items():
+    display_name = PROVIDER_DISPLAY.get(prov, prov.capitalize())
+    combined_models = OrderedDict()
+    primary_url = server_list[0][1]["url"]
+
+    for _, server in server_list:
+        for pid_key, pd in server_model_maps.items():
+            if pd.get("url") == server["url"]:
+                for mid, mdata in pd["models"].items():
+                    combined_models[mid] = clean(mdata)
+
+    if len(server_list) > 1:
+        display_name = f"{display_name} ({len(server_list)} servers)"
+
+    provider_config[prov] = {
         "npm": "@ai-sdk/openai-compatible",
-        "name": "Ollama",
-        "options": make_options(servers[0]["url"]),
-        "models": {k: clean(v) for k, v in all_models.items()},
+        "name": display_name,
+        "options": make_options(primary_url),
+        "models": combined_models,
     }
-else:
-    combined = OrderedDict()
-    for pd in server_model_maps.values():
-        for mid, mdata in pd["models"].items():
-            combined[mid] = clean(mdata)
-    provider_config["ollama"] = {
-        "npm": "@ai-sdk/openai-compatible",
-        "name": "Ollama",
-        "options": make_options(servers[0]["url"]),
-        "models": combined,
-    }
-    for pid, pd in server_model_maps.items():
-        if pid == "ollama":
-            continue
-        provider_config[pid] = {
-            "npm": "@ai-sdk/openai-compatible",
-            "name": f"Ollama ({pd['label']})",
-            "options": make_options(pd["url"]),
-            "models": {k: clean(v) for k, v in pd["models"].items()},
-        }
+
+# If only one provider type, use simple name
+if len(provider_config) == 1:
+    prov = next(iter(provider_config))
+    provider_config[prov]["name"] = PROVIDER_DISPLAY.get(prov, prov.capitalize())
 
 # --- Merge: keep other providers from existing config ---
 
@@ -907,9 +943,11 @@ else:
     config["$schema"] = "https://opencode.ai/config.json"
 
 config["provider"] = provider_config
-config["model"] = f"ollama/{first_model}"
+# Determine provider prefix for model reference
+first_provider = next(iter(provider_config), "ollama")
+config["model"] = f"{first_provider}/{first_model}"
 if small_model != first_model:
-    config["small_model"] = f"ollama/{small_model}"
+    config["small_model"] = f"{first_provider}/{small_model}"
 
 # Merge: keep other top-level keys from existing
 if existing:
@@ -992,8 +1030,13 @@ main() {
     parse_args "$@"
     check_dependencies
 
+    # Load adapters base
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    source "${script_dir}/adapters/base.sh"
+
     echo -e "${CYAN}========================================${NC}" >&2
-    echo -e "${CYAN}  OpenCode Config Generator for Ollama${NC}" >&2
+    echo -e "${CYAN}  OpenCode Config Generator${NC}" >&2
     echo -e "${CYAN}========================================${NC}" >&2
     echo "" >&2
 
@@ -1003,17 +1046,28 @@ main() {
         validate_url "$rurl" || exit 1
     done
 
+    # Auto-detect providers if not specified
+    if [[ -z "$LOCAL_PROVIDER" ]]; then
+        LOCAL_PROVIDER=$(detect_provider "$LOCAL_URL")
+        log_step "Auto-detected provider: ${LOCAL_PROVIDER} ($LOCAL_URL)"
+    fi
+
     # Collect all servers data via process_server
     local servers_json="["
     local ctx_maps="{"
     local first_server=true
 
     # Process local server
-    process_server "$LOCAL_URL" "local" "local"
+    process_server "$LOCAL_URL" "$LOCAL_PROVIDER" "local" "local"
 
     # Process remote servers
-    for remote_url in "${REMOTE_URLS[@]}"; do
-        process_server "$remote_url" "remote" "remote"
+    for i in "${!REMOTE_URLS[@]}"; do
+        local remote_url="${REMOTE_URLS[$i]}"
+        local remote_provider="${REMOTE_PROVIDERS[$i]:-}"
+        if [[ -z "$remote_provider" ]]; then
+            remote_provider=$(detect_provider "$remote_url")
+        fi
+        process_server "$remote_url" "$remote_provider" "remote" "remote"
     done
 
     servers_json+="]"
@@ -1029,8 +1083,8 @@ print(total)
 " 2>/dev/null || echo "0")
 
     if [[ "$model_count" -eq 0 ]]; then
-        log_error "Could not fetch models from any Ollama server."
-        log_error "Make sure Ollama is running and accessible."
+        log_error "Could not fetch models from any server."
+        log_error "Make sure the server is running and accessible."
         exit 1
     fi
 
@@ -1041,17 +1095,31 @@ print(total)
     log_info "Done!"
 }
 
-# Process a single Ollama server: fetch models, get context, handle interactive
-# Args: $1=url, $2=label (local/remote), $3=server_label for display
+# Process a server: fetch models via adapter, get context, handle interactive
+# Args: $1=url, $2=provider, $3=label (local/remote), $4=server_label for display
 process_server() {
     local server_url="$1"
-    local label="$2"
-    local display_label="$3"
+    local provider="$2"
+    local label="$3"
+    local display_label="$4"
 
+    # Load adapter
+    load_adapter "$provider" || {
+        log_warn "Unknown provider: $provider, skipping $server_url"
+        return
+    }
+
+    local provider_name
+    provider_name=$(adapter_provider_name)
+
+    log_step "Fetching models from ${provider_name} (${server_url})..."
+
+    # Fetch models via adapter
     local models_json
-    models_json=$(fetch_models "$server_url" "$display_label Ollama ($server_url)" || true)
+    models_json=$(adapter_fetch_models "$server_url" || true)
 
-    if [[ -z "$models_json" ]]; then
+    if [[ -z "$models_json" || "$models_json" == '{"models":[]}' ]]; then
+        log_warn "No models returned from ${provider_name} ($server_url)"
         return
     fi
 
@@ -1066,10 +1134,32 @@ except:
     pass
 " 2>/dev/null || echo "")
 
-    # Fetch context lengths
+    # Fetch context lengths (only if adapter supports it)
     local ctx_json="{}"
     if [[ "$NO_CONTEXT_LOOKUP" == false && -n "$model_names" ]]; then
-        ctx_json=$(fetch_context_lengths_batch "$server_url" "$model_names" || echo "{}")
+        if adapter_has_rich_metadata 2>/dev/null; then
+            ctx_json=$(fetch_context_lengths_batch "$server_url" "$model_names" || echo "{}")
+        else
+            # Try adapter_get_context for per-model context (e.g., llama.cpp /props)
+            local adapter_ctx
+            adapter_ctx=$(adapter_get_context "$server_url" 2>/dev/null || echo "")
+            if [[ -n "$adapter_ctx" ]]; then
+                ctx_json=$(echo "$model_names" | tr ' ' '\n' | python3 -c "
+import sys
+ctx = '${adapter_ctx}'
+result = '{'
+first = True
+for name in sys.stdin:
+    name = name.strip()
+    if name:
+        if not first: result += ', '
+        result += f'\"{name}\": {ctx}'
+        first = False
+result += '}'
+print(result)
+" 2>/dev/null || echo "{}")
+            fi
+        fi
     fi
 
     # Interactive selection
@@ -1087,7 +1177,7 @@ for m in d.get('models', []):
         'family': details.get('family', ''),
         'param_size': details.get('parameter_size', ''),
         'quantization': details.get('quantization_level', ''),
-        'context': 8192,
+        'context': m.get('context', 8192),
     })
 print(json.dumps(result))
 " 2>/dev/null || echo "[]")
@@ -1114,12 +1204,14 @@ print(json.dumps(d))
     fi
 
     export SERVER_URL="$server_url"
+    export SERVER_PROVIDER="$provider"
     servers_json+=$(echo "$selected_models" | python3 -c "
 import os, sys, json
 d = json.load(sys.stdin)
 print(json.dumps({
     'url': os.environ.get('SERVER_URL', ''),
     'label': '${label}',
+    'provider': os.environ.get('SERVER_PROVIDER', 'unknown'),
     'models': d.get('models', [])
 }))
 " 2>/dev/null || echo "{}")

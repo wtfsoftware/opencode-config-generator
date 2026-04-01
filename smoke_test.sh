@@ -181,6 +181,14 @@ print(any('@' in k for k in d['provider']['ollama']['models']))
         fail "deduplication adds @suffix"
     fi
 
+    # Explicit provider flag
+    result=$($SCRIPT -n --no-context-lookup --include "qwen2.5-coder:7b" -p ollama 2>/dev/null)
+    if echo "$result" | python3 -c "import sys,json; assert 'ollama' in json.load(sys.stdin)['provider']" 2>/dev/null; then
+        pass "--provider ollama works"
+    else
+        fail "--provider ollama works"
+    fi
+
 fi
 
 # --- Summary ---
