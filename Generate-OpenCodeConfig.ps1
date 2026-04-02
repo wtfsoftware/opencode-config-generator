@@ -43,7 +43,7 @@ $ErrorActionPreference = "Stop"
 # Defaults
 # ============================================================================
 
-$ScriptVersion = "1.4.3"
+$ScriptVersion = "1.4.4"
 $CacheTTL = 86400  # 24 hours
 
 if (-not $LocalOllamaUrl) {
@@ -573,21 +573,37 @@ function Process-Models {
             $ctx = Get-HardcodedContext -Family $family
         }
         
-        $displayParts = @()
-        if ($family) { $displayParts += ($family.Substring(0,1).ToUpper() + $family.Substring(1)) }
-        if ($paramSize) { $displayParts += $paramSize }
-        if ($quant -and $quant.ToLower() -ne "unknown") { $displayParts += $quant }
-        $displayName = if ($displayParts.Count -gt 0) { ($displayParts -join " ") + " ($Label)" } else { "$name ($Label)" }
-        
         $result[$name] = [ordered]@{
-            "name"  = $displayName
+            "name"  = $name
             "limit" = [ordered]@{
                 "context" = $ctx
                 "output"  = [Math]::Min($ctx, $MaxOutput)
             }
             "_info" = [ordered]@{
                 "name"         = $name
-                "display"      = $displayName
+                "display"      = $name
+                "family"       = $family
+                "param_size"   = $paramSize
+                "quantization" = $quant
+                "context"      = $ctx
+                "ctx_source"   = $ctxSource
+                "server_label" = $Label
+                "server_url"   = $ServerUrl
+            }
+        }
+        if (-not $ctx) {
+            $ctx = Get-HardcodedContext -Family $family
+        }
+        
+        $result[$name] = [ordered]@{
+            "name"  = $name
+            "limit" = [ordered]@{
+                "context" = $ctx
+                "output"  = [Math]::Min($ctx, $MaxOutput)
+            }
+            "_info" = [ordered]@{
+                "name"         = $name
+                "display"      = $name
                 "family"       = $family
                 "param_size"   = $paramSize
                 "quantization" = $quant

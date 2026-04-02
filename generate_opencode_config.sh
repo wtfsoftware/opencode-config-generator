@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-VERSION="1.4.3"
+VERSION="1.4.4"
 
 # ============================================================================
 # Defaults
@@ -970,24 +970,14 @@ def process_models(server_data, ctx_map):
             context_length = get_hardcoded_context(family)
             ctx_source = "hardcoded"
 
-        display_parts = []
-        if family:
-            display_parts.append(family.capitalize())
-        if param_size:
-            display_parts.append(param_size)
-        if quant and quant.lower() != "unknown":
-            display_parts.append(quant)
-        display_name = " ".join(display_parts) if display_parts else name
-        display_name += f" ({label})"
-
         result[name] = {
-            "name": display_name,
+            "name": name,
             "limit": {
                 "context": context_length,
                 "output": min(context_length, max_output),
             },
             "_info": {
-                "name": name, "display": display_name, "family": family,
+                "name": name, "display": name, "family": family,
                 "param_size": param_size, "quantization": quant,
                 "context": context_length, "ctx_source": ctx_source,
                 "server_label": label, "server_url": server_data.get("url", ""),

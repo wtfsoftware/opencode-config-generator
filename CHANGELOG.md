@@ -15,6 +15,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Removed model deduplication with `@host:port` suffixes since each server now has its own provider entry — models no longer duplicate across providers with different names
 
+## [1.4.4] - 2026-04-03
+
+### Changed
+- Model `name` field now shows the actual model name (e.g. `qwen2.5-coder:7b`) instead of a generated display name (e.g. `Qwen2 7.6B Q4_K_M (local)`)
+
+## [1.4.4] - 2026-04-03
+
+### Changed
+- Model `name` field now shows the actual model name (e.g. `qwen2.5-coder:7b`) instead of a generated display name (e.g. `Qwen2 7.6B Q4_K_M (local)`)
+
 ## [1.4.3] - 2026-04-03
 
 ### Fixed
