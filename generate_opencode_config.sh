@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-VERSION="1.2.0"
+VERSION="1.3.0"
 
 # ============================================================================
 # Defaults
@@ -45,6 +45,7 @@ MAX_SIZE=""
 MIN_SIZE=""
 SORT_BY=""
 LIMIT_N=""
+NO_TOOLS_FILTER=false
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/opencode-generator"
 
 # ============================================================================
@@ -91,6 +92,7 @@ OPTIONS:
         --include PATTERN    Include models matching glob pattern (repeatable)
         --exclude PATTERN    Exclude models matching glob pattern (repeatable)
         --with-embed         Include embedding models (excluded by default)
+        --tools-only         Only include models that support tool/function calling
         --no-context-lookup  Skip /api/show calls, use hardcoded context limits
         --num-ctx N          num_ctx for Ollama models, 0 to omit (default: 0)
         --max-output N       Max output tokens cap (default: 16384)
@@ -203,6 +205,10 @@ parse_args() {
                 ;;
             --with-embed)
                 NO_EMBED=false
+                shift
+                ;;
+            --tools-only)
+                NO_TOOLS_FILTER=true
                 shift
                 ;;
             --no-context-lookup)
@@ -707,6 +713,7 @@ generate_config() {
     export CONFIG_MIN_SIZE="$MIN_SIZE"
     export CONFIG_SORT_BY="$SORT_BY"
     export CONFIG_LIMIT_N="$LIMIT_N"
+    export CONFIG_NO_TOOLS_FILTER="$NO_TOOLS_FILTER"
 
     python3 <<'PYEOF'
 import os
@@ -734,11 +741,34 @@ max_size_str = os.environ.get("CONFIG_MAX_SIZE", "").strip()
 min_size_str = os.environ.get("CONFIG_MIN_SIZE", "").strip()
 sort_by = os.environ.get("CONFIG_SORT_BY", "").strip()
 limit_n = os.environ.get("CONFIG_LIMIT_N", "").strip()
+no_tools_filter = os.environ.get("CONFIG_NO_TOOLS_FILTER", "false") == "true"
 
 include_patterns = include_str.split() if include_str else []
 exclude_patterns = exclude_str.split() if exclude_str else []
 
 EMBED_KEYWORDS = {"nomic-bert", "bert", "bert-moe", "embed", "embedding", "jina-embeddings"}
+
+TOOL_CAPABLE_FAMILIES = {
+    "qwen2.5", "qwen2.5-coder", "qwen3", "qwen3-coder",
+    "llama3", "llama3.1", "llama3.2", "llama3.3",
+    "mistral", "mistral-nemo", "mixtral",
+    "deepseek-r1", "deepseek-v3",
+    "command-r", "command-r-plus", "command-a",
+    "phi3", "phi4",
+    "gemma2", "gemma3",
+    "granite3", "granite3.1", "granite3.2",
+}
+
+TOOL_CAPABLE_FAMILIES = {
+    "qwen2.5", "qwen2.5-coder", "qwen3", "qwen3-coder",
+    "llama3", "llama3.1", "llama3.2", "llama3.3",
+    "mistral", "mistral-nemo", "mixtral",
+    "deepseek-r1", "deepseek-v3",
+    "command-r", "command-r-plus", "command-a",
+    "phi3", "phi4",
+    "gemma2", "gemma3",
+    "granite3", "granite3.1", "granite3.2",
+}
 
 HARDCODED_CONTEXT = {
     "qwen3": 131072, "qwen2.5": 131072, "qwen2": 32768, "qwen": 32768,
@@ -803,6 +833,18 @@ def matches_include(name):
 def matches_exclude(name):
     return any(fnmatch.fnmatch(name, p) for p in exclude_patterns)
 
+def supports_tools(m):
+    caps = m.get("capabilities", {})
+    if caps.get("tool_use"):
+        return True
+    details = m.get("details", {})
+    family = details.get("family", "")
+    families = details.get("families", [])
+    all_families = families + ([family] if family else [])
+    name = m.get("name", "").lower()
+    all_text = " ".join(f.lower() for f in all_families) + " " + name
+    return any(kw in all_text for kw in TOOL_CAPABLE_FAMILIES)
+
 # --- Process models from servers ---
 
 def process_models(server_data, ctx_map):
@@ -833,6 +875,9 @@ def process_models(server_data, ctx_map):
             ps = parse_param_size(param_size)
             if ps > max_size or ps < min_size:
                 continue
+
+        if no_tools_filter and not supports_tools(m):
+            continue
 
         if not no_ctx_lookup and name in ctx_map and ctx_map[name]:
             context_length = int(ctx_map[name])
@@ -1163,6 +1208,10 @@ skipped_embed = sum(
     1 for s in servers for m in s.get("models", [])
     if is_embed_model(m.get("details", {}).get("families", []) + [m.get("details", {}).get("family", "")], m.get("name", ""))
 )
+skipped_no_tools = sum(
+    1 for s in servers for m in s.get("models", [])
+    if not supports_tools(m)
+)
 api_ctx = sum(1 for d in all_models.values() if d["_info"]["ctx_source"] == "api")
 hardcoded_ctx = sum(1 for d in all_models.values() if d["_info"]["ctx_source"] == "hardcoded")
 
@@ -1171,6 +1220,10 @@ print("Results:", file=sys.stderr)
 print(f"  Models included:      {total}", file=sys.stderr)
 if skipped_embed > 0:
     print(f"  Embedding filtered:   {skipped_embed}", file=sys.stderr)
+if skipped_no_tools > 0:
+    print(f"  Tools filtered:       {skipped_no_tools}", file=sys.stderr)
+if skipped_no_tools > 0:
+    print(f"  Tools filtered:       {skipped_no_tools}", file=sys.stderr)
 if dup_info:
     print(f"  Duplicates (suffixed): {len(dup_info)}", file=sys.stderr)
 if api_ctx > 0 or hardcoded_ctx > 0:

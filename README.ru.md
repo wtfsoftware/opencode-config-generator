@@ -141,6 +141,7 @@
 | `--include PAT` | Включить модели по glob-паттерну (можно несколько) | все |
 | `--exclude PAT` | Исключить модели по glob-паттерну (можно несколько) | нет |
 | `--with-embed` | Включить embedding-модели | исключены |
+| `--tools-only` | Only models with tool/function calling support | off |
 | `--no-context-lookup` | Пропустить `/api/show`, использовать хардкод | выкл |
 | `--num-ctx N` | `num_ctx` для провайдера, 0 — не добавлять | `0` |
 | `--merge` | Слить с существующим конфигом | выкл |
@@ -162,6 +163,7 @@
 | `-Include` | Паттерны включения (wildcard) | все |
 | `-Exclude` | Паттерны исключения (wildcard) | нет |
 | `-WithEmbed` | Включить embedding-модели | исключены |
+| `-ToolsOnly` | Only models with tool/function calling support | off |
 | `-NoContextLookup` | Пропустить `/api/show` | выкл |
 | `-NumCtx` | `num_ctx` для провайдера | `0` |
 | `-Merge` | Слить с существующим | выкл |

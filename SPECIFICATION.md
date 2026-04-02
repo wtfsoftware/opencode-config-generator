@@ -250,6 +250,7 @@ Both scripts support identical flags (adapted for platform conventions):
 | `--include PAT` | `-Include` | string[] | `[]` |
 | `--exclude PAT` | `-Exclude` | string[] | `[]` |
 | `--with-embed` | `-WithEmbed` | flag | off |
+| `--tools-only` | `-ToolsOnly` | flag | off |
 | `--no-context-lookup` | `-NoContextLookup` | flag | off |
 | `--num-ctx N` | `-NumCtx` | int | 0 |
 | `--max-output N` | `-MaxOutput` | int | 16384 |
@@ -336,6 +337,7 @@ Python standard library only (no pip packages):
 | Include filter | `./generate_opencode_config.sh -n --include "qwen*"` |
 | Exclude filter | `./generate_opencode_config.sh -n --exclude "*embed*"` |
 | With embed | `./generate_opencode_config.sh -n --with-embed` |
+| Tools only | `./generate_opencode_config.sh -n --tools-only` |
 | Default model | `./generate_opencode_config.sh -n --default-model qwen2.5-coder:7b` |
 | Small model | `./generate_opencode_config.sh -n --small-model qwen2.5-coder:3b` |
 | Num ctx | `./generate_opencode_config.sh -n --num-ctx 32768` |
@@ -364,6 +366,10 @@ print('PASS: all assertions')
 ## 11. Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for the full changelog.
+
+### v1.3.0
+- `--tools-only` / `-ToolsOnly` filter for tool/function calling support
+- Two-tier detection: exact (LM Studio `capabilities.tool_use`) + heuristic (family allowlist)
 
 ### v1.2.0
 - `--max-size`/`--min-size` model size filtering

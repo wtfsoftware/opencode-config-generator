@@ -6,7 +6,7 @@ Generates `opencode.json` configuration from local and remote Ollama servers.
 
 English | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | [中文](README.zh.md) | [日本語](README.ja.md) | [Português](README.pt.md) | [Italiano](README.it.md) | [한국어](README.ko.md) | [العربية](README.ar.md) | [Nederlands](README.nl.md) | [Українська](README.ua.md)
 
-**v1.1.0** | [Specification](SPECIFICATION.md) | [Development](DEVELOPMENT.md) | [Disclaimer](DISCLAIMER.md)
+**v1.3.0** | [Specification](SPECIFICATION.md) | [Development](DEVELOPMENT.md) | [Disclaimer](DISCLAIMER.md)
 
 ## Features
 
@@ -14,6 +14,7 @@ English | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch]
 - Auto-detects provider by port, or specify with `-p`
 - Auto-discovers all models via provider API
 - Filters out embedding models (nomic-bert, LM Studio type field, etc.)
+- Filter models by tool/function calling support (`--tools-only`)
 - Fetches exact context lengths (Ollama `/api/show`, llama.cpp `/props`, LM Studio rich metadata)
 - Supports multiple servers of different providers simultaneously
 - Interactive model selection (with "All models" option)
@@ -65,6 +66,9 @@ English | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch]
 
 # Include embedding models
 ./generate_opencode_config.sh --with-embed
+
+# Only models with tool/function calling support
+./generate_opencode_config.sh --tools-only
 
 # Preview without writing file
 ./generate_opencode_config.sh -n
@@ -129,6 +133,7 @@ English | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch]
 | `--include PATTERN` | Include models matching glob (repeatable) | all |
 | `--exclude PATTERN` | Exclude models matching glob (repeatable) | none |
 | `--with-embed` | Include embedding models | excluded |
+| `--tools-only` | Only models with tool/function calling support | off |
 | `--no-context-lookup` | Skip `/api/show`, use hardcoded limits | off |
 | `--num-ctx N` | `num_ctx` for provider options, 0 to omit | `0` |
 | `--merge` | Merge into existing config (update models only) | off |
@@ -150,6 +155,7 @@ English | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch]
 | `-Include` | Include patterns (wildcard, array) | all |
 | `-Exclude` | Exclude patterns (wildcard, array) | none |
 | `-WithEmbed` | Include embedding models | excluded |
+| `-ToolsOnly` | Only models with tool/function calling support | off |
 | `-NoContextLookup` | Skip `/api/show`, use hardcoded limits | off |
 | `-NumCtx` | `num_ctx` for provider options, 0 to omit | `0` |
 | `-Merge` | Merge into existing config (update models only) | off |
@@ -240,6 +246,34 @@ Embedding models are **excluded by default** because they don't support chat/too
 - Model names containing these keywords
 
 Use `--with-embed` / `-WithEmbed` to include them.
+
+## Tool/Function Calling Filter
+
+Use `--tools-only` / `-ToolsOnly` to include only models that support tool/function calling:
+
+```bash
+./generate_opencode_config.sh --tools-only
+```
+
+Detection works in two tiers:
+1. **Exact** — LM Studio provides `capabilities.tool_use` via its rich `/api/v1/models` endpoint
+2. **Heuristic** — for all other providers, models are matched against a known allowlist of tool-capable families (qwen2.5/3, llama3.x, mistral, mixtral, deepseek-r1/v3, command-r, phi3/4, gemma2/3, granite3.x)
+
+Models not matching either check are excluded when `--tools-only` is active. The allowlist may need updates as new model families are released.
+
+## Tool/Function Calling Filter
+
+Use `--tools-only` / `-ToolsOnly` to include only models that support tool/function calling:
+
+```bash
+./generate_opencode_config.sh --tools-only
+```
+
+Detection works in two tiers:
+1. **Exact** — LM Studio provides `capabilities.tool_use` via its rich `/api/v1/models` endpoint
+2. **Heuristic** — for all other providers, models are matched against a known allowlist of tool-capable families (qwen2.5/3, llama3.x, mistral, mixtral, deepseek-r1/v3, command-r, phi3/4, gemma2/3, granite3.x)
+
+Models not matching either check are excluded when `--tools-only` is active. The allowlist may need updates as new model families are released.
 
 ## Multi-Provider Support
 

@@ -162,6 +162,7 @@ CONFIG_EXCLUDE_PATTERNS                   → exclude_patterns[]
 For each server:
     process_models()
         ├─ filter embed
+        ├─ filter tools (--tools-only)
         ├─ filter include/exclude
         ├─ assign context
         └─ build model config
@@ -318,6 +319,7 @@ Run each test and verify output:
 ./generate_opencode_config.sh -n --no-context-lookup --include "qwen*"
 ./generate_opencode_config.sh -n --no-context-lookup --exclude "*llama*"
 ./generate_opencode_config.sh -n --no-context-lookup --with-embed
+./generate_opencode_config.sh -n --no-context-lookup --tools-only
 
 # Options
 ./generate_opencode_config.sh -n --no-context-lookup --num-ctx 32768
@@ -443,7 +445,7 @@ git push origin main --tags
 |------------|--------|------------|
 | No Windows native (without Git Bash/WSL) | Bash script requires bash | Use PowerShell script |
 | Parallel `/api/show` not truly parallel in PowerShell | `Start-Job` overhead | Use `--no-context-lookup` for speed |
-| No model capability detection | Ollama `/api/tags` doesn't return capabilities | Use `--exclude` to filter manually |
+| No model capability detection | Ollama `/api/tags` doesn't return capabilities | `--tools-only` uses heuristic allowlist; LM Studio has exact `capabilities.tool_use` |
 | `num_ctx` may not work in all OpenCode versions | Depends on AI SDK provider options | Omit (default 0) or test manually |
 | Cache doesn't detect model updates | TTL-based only | Use `--no-cache` or wait 24h |
 | Interactive mode requires terminal | `read -r` needs TTY | Don't use `-i` in CI/scripts |

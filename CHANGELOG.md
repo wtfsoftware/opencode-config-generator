@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] - 2026-04-02
+
+### Added
+- `--tools-only` — only include models that support tool/function calling (uses `capabilities.tool_use` for LM Studio, heuristic allowlist for others)
+
+## [1.3.0] - 2026-04-02
+
+### Added
+- `--tools-only` — only include models that support tool/function calling (uses `capabilities.tool_use` for LM Studio, heuristic allowlist for others)
+
 ## [1.2.0] - 2026-04-02
 
 ### Added

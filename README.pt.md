@@ -4,7 +4,7 @@ Gera `opencode.json` para [OpenCode](https://opencode.ai) a partir dos modelos d
 
 [English](README.md) | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | [中文](README.zh.md) | [日本語](README.ja.md) | [Português](README.pt.md) | [Italiano](README.it.md) | [한국어](README.ko.md) | [العربية](README.ar.md) | [Nederlands](README.nl.md) | [Українська](README.ua.md)
 
-**v1.1.0** | [Specification](SPECIFICATION.md) | [Development](DEVELOPMENT.md) | [Disclaimer](DISCLAIMER.md)
+**v1.3.0** | [Specification](SPECIFICATION.md) | [Development](DEVELOPMENT.md) | [Disclaimer](DISCLAIMER.md)
 
 ---
 
@@ -63,6 +63,8 @@ Gera `opencode.json` para [OpenCode](https://opencode.ai) a partir dos modelos d
 | `--include PAT` | Include pattern |
 | `--exclude PAT` | Exclude pattern |
 | `--with-embed` | Include embed models |
+| `--tools-only` | Only models with tool/function calling support |
+| `-ToolsOnly` | Only models with tool/function calling support |
 | `--no-context-lookup` | Skip API lookup |
 | `--num-ctx N` | num_ctx (0=omit) |
 | `--merge` | Merge config |

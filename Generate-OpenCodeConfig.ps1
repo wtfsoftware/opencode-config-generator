@@ -32,6 +32,7 @@ param(
     [switch]$NoColor,
     [switch]$Quiet,
     [string]$Check = "",
+    [switch]$ToolsOnly,
     [switch]$Version,
     [switch]$Help
 )
@@ -42,7 +43,7 @@ $ErrorActionPreference = "Stop"
 # Defaults
 # ============================================================================
 
-$ScriptVersion = "1.2.0"
+$ScriptVersion = "1.3.0"
 $CacheTTL = 86400  # 24 hours
 
 if (-not $LocalOllamaUrl) {
@@ -50,6 +51,28 @@ if (-not $LocalOllamaUrl) {
 }
 
 $EmbedKeywords = @("nomic-bert", "bert", "bert-moe", "embed", "embedding", "jina-embeddings")
+
+$ToolCapableFamilies = @(
+    "qwen2.5", "qwen2.5-coder", "qwen3", "qwen3-coder",
+    "llama3", "llama3.1", "llama3.2", "llama3.3",
+    "mistral", "mistral-nemo", "mixtral",
+    "deepseek-r1", "deepseek-v3",
+    "command-r", "command-r-plus", "command-a",
+    "phi3", "phi4",
+    "gemma2", "gemma3",
+    "granite3", "granite3.1", "granite3.2"
+)
+
+$ToolCapableFamilies = @(
+    "qwen2.5", "qwen2.5-coder", "qwen3", "qwen3-coder",
+    "llama3", "llama3.1", "llama3.2", "llama3.3",
+    "mistral", "mistral-nemo", "mixtral",
+    "deepseek-r1", "deepseek-v3",
+    "command-r", "command-r-plus", "command-a",
+    "phi3", "phi4",
+    "gemma2", "gemma3",
+    "granite3", "granite3.1", "granite3.2"
+)
 
 $HardcodedContext = @{
     "qwen3"       = 131072
@@ -127,6 +150,7 @@ OPTIONS:
     -Include PATTERN           Include models matching wildcard pattern (array)
     -Exclude PATTERN           Exclude models matching wildcard pattern (array)
     -WithEmbed                 Include embedding models (excluded by default)
+    -ToolsOnly                 Only include models that support tool/function calling
     -NoContextLookup           Skip /api/show calls, use hardcoded context limits
     -NumCtx N                  num_ctx for Ollama provider, 0 to omit (default: 0)
     -MaxOutput N               Max output tokens cap (default: 16384)
@@ -306,6 +330,38 @@ function Test-IsEmbedModel {
     return $false
 }
 
+function Test-IsToolCapable {
+    param([object]$Model)
+    $caps = $Model.capabilities
+    if ($caps -and $caps.tool_use) { return $true }
+    
+    $families = @($Model.details.families)
+    $family = $Model.details.family
+    $name = $Model.name.ToLower()
+    $allText = (($families + @($family)) -join " ").ToLower() + " " + $name
+    
+    foreach ($kw in $ToolCapableFamilies) {
+        if ($allText.Contains($kw.ToLower())) { return $true }
+    }
+    return $false
+}
+
+function Test-IsToolCapable {
+    param([object]$Model)
+    $caps = $Model.capabilities
+    if ($caps -and $caps.tool_use) { return $true }
+    
+    $families = @($Model.details.families)
+    $family = $Model.details.family
+    $name = $Model.name.ToLower()
+    $allText = (($families + @($family)) -join " ").ToLower() + " " + $name
+    
+    foreach ($kw in $ToolCapableFamilies) {
+        if ($allText.Contains($kw.ToLower())) { return $true }
+    }
+    return $false
+}
+
 function Get-HardcodedContext {
     param([string]$Family)
     $fl = $Family.ToLower()
@@ -416,6 +472,7 @@ function Process-Models {
         if ($NoEmbed -and (Test-IsEmbedModel -Families ($families + @($family)) -Name $name)) { continue }
         if (-not (Test-MatchesInclude -Name $name -Patterns $Include)) { continue }
         if (Test-MatchesExclude -Name $name -Patterns $Exclude) { continue }
+        if ($ToolsOnly -and -not (Test-IsToolCapable -Model $m)) { continue }
         
         # Size filtering
         if ($paramSize -and ($MaxSize -or $MinSize)) {
@@ -891,12 +948,16 @@ else {
 # Summary
 $total = $allModels.Count
 $skippedEmbed = 0
+$skippedTools = 0
 foreach ($server in $allServers) {
     foreach ($m in $server.models.models) {
         $families = @($m.details.families)
         $family = $m.details.family
         if (Test-IsEmbedModel -Families ($families + @($family)) -Name $m.name) {
             $skippedEmbed++
+        }
+        if (-not (Test-IsToolCapable -Model $m)) {
+            $skippedTools++
         }
     }
 }
@@ -908,6 +969,9 @@ Write-Host "Results:" -ForegroundColor Green
 Write-Host "  Models included:      $total" -ForegroundColor White
 if ($skippedEmbed -gt 0) {
     Write-Host "  Embedding filtered:   $skippedEmbed" -ForegroundColor White
+}
+if ($skippedTools -gt 0) {
+    Write-Host "  Tools filtered:       $skippedTools" -ForegroundColor White
 }
 if ($dupInfo.Count -gt 0) {
     Write-Host "  Duplicates (suffixed): $($dupInfo.Count)" -ForegroundColor White

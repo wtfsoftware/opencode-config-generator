@@ -6,7 +6,7 @@
 
 [English](README.md) | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | 中文 | [日本語](README.ja.md) | [Português](README.pt.md) | [Italiano](README.it.md) | [한국어](README.ko.md) | [العربية](README.ar.md) | [Nederlands](README.nl.md) | [Українська](README.ua.md)
 
-**v1.1.0** | [规范文档](SPECIFICATION.md) | [开发文档](DEVELOPMENT.md) | [免责声明](DISCLAIMER.md)
+**v1.3.0** | [规范文档](SPECIFICATION.md) | [开发文档](DEVELOPMENT.md) | [免责声明](DISCLAIMER.md)
 
 ## 功能特性
 
@@ -129,6 +129,7 @@
 | `--include PATTERN` | 包含匹配 glob 的模型（可多次指定） | 全部 |
 | `--exclude PATTERN` | 排除匹配 glob 的模型（可多次指定） | 无 |
 | `--with-embed` | 包含 embedding 模型 | 排除 |
+| `--tools-only` | Only models with tool/function calling support | off |
 | `--no-context-lookup` | 跳过 `/api/show`，使用硬编码限制 | 关 |
 | `--num-ctx N` | provider options 的 `num_ctx`，0 表示省略 | `0` |
 | `--merge` | 合并到现有配置（仅更新模型） | 关 |
@@ -150,6 +151,7 @@
 | `-Include` | 包含模式（通配符，数组） | 全部 |
 | `-Exclude` | 排除模式（通配符，数组） | 无 |
 | `-WithEmbed` | 包含 embedding 模型 | 排除 |
+| `-ToolsOnly` | Only models with tool/function calling support | off |
 | `-NoContextLookup` | 跳过 `/api/show`，使用硬编码限制 | 关 |
 | `-NumCtx` | provider options 的 `num_ctx`，0 表示省略 | `0` |
 | `-Merge` | 合并到现有配置（仅更新模型） | 关 |
