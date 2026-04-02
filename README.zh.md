@@ -6,7 +6,7 @@
 
 [English](README.md) | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | 中文 | [日本語](README.ja.md) | [Português](README.pt.md) | [Italiano](README.it.md) | [한국어](README.ko.md) | [العربية](README.ar.md) | [Nederlands](README.nl.md) | [Українська](README.ua.md)
 
-**v1.4.2** | [规范文档](SPECIFICATION.md) | [开发文档](DEVELOPMENT.md) | [免责声明](DISCLAIMER.md)
+**v1.4.3** | [规范文档](SPECIFICATION.md) | [开发文档](DEVELOPMENT.md) | [免责声明](DISCLAIMER.md)
 
 ## 功能特性
 

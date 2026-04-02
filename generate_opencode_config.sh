@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-VERSION="1.4.2"
+VERSION="1.4.3"
 
 # ============================================================================
 # Defaults
@@ -1022,64 +1022,12 @@ for idx, server in enumerate(servers):
             model_sources[name] = []
         model_sources[name].append((server["label"], server["url"]))
 
-# Build all_models with server suffixes for duplicates
-# First server keeps original name, others get @host:port, @host:port-2, etc.
-dup_info = {}  # name -> list of suffixed names for logging
-
+# No deduplication needed — each server gets its own provider with its own baseURL.
+# Just add all models with their original names.
 for name in model_sources:
-    sources = model_sources[name]
-    if len(sources) == 1:
-        # No duplicate, add model as-is
-        for pid, pd in server_model_maps.items():
-            if name in pd["models"]:
-                all_models[name] = pd["models"][name]
-                break
-    else:
-        # Duplicate: generate suffixes
-        suffixed_names = []
-        suffix_counter = {}
-        for label, url in sources:
-            try:
-                from urllib.parse import urlparse
-                parsed = urlparse(url)
-                host = parsed.hostname or label
-                port = parsed.port
-                suffix_base = f"{host}:{port}" if port and port not in (80, 443) else host
-            except Exception:
-                suffix_base = label
-
-            if suffix_base not in suffix_counter:
-                suffix_counter[suffix_base] = 0
-            suffix_counter[suffix_base] += 1
-
-            count = suffix_counter[suffix_base]
-            suffixed = f"{name}@{suffix_base}" if count == 1 else f"{name}@{suffix_base}-{count}"
-            suffixed_names.append(suffixed)
-
-        dup_info[name] = suffixed_names
-
-        # Add each version: update both all_models AND server_model_maps
-        for idx, (label, url) in enumerate(sources):
-            suffixed_name = suffixed_names[idx]
-            for pid, pd in server_model_maps.items():
-                if pd["url"] == url and name in pd["models"]:
-                    model_data = pd["models"][name].copy()
-                    info = model_data["_info"]
-                    suffix_display = suffixed_name.split("@", 1)[1] if "@" in suffixed_name else ""
-                    model_data["name"] = f'{info["display"].rsplit(" (", 1)[0]} ({suffix_display})'
-                    model_data["id"] = name  # original name for API calls
-
-                    # Rename in server_model_maps (for provider_config)
-                    del pd["models"][name]
-                    pd["models"][suffixed_name] = model_data
-
-                    all_models[suffixed_name] = model_data
-                    break
-
-if dup_info:
-    print("Deduplication: models found on multiple servers:", file=sys.stderr)
-    for orig_name, suffixed_list in dup_info.items():
-        print(f"  - {orig_name} -> {', '.join(suffixed_list)}", file=sys.stderr)
+    for pid, pd in server_model_maps.items():
+        if name in pd["models"]:
+            all_models[name] = pd["models"][name]
 
 if not all_models:
     print("WARNING: No models found after filtering!", file=sys.stderr)

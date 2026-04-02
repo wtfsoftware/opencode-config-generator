@@ -10,6 +10,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Each server now gets its own provider entry with correct `baseURL`, instead of combining all servers of the same type into one provider (fixes models from remote servers being unreachable)
 - `model` and `small_model` now reference the correct provider ID that actually owns the model
 
+## [1.4.3] - 2026-04-03
+
+### Fixed
+- Removed model deduplication with `@host:port` suffixes since each server now has its own provider entry — models no longer duplicate across providers with different names
+
+## [1.4.3] - 2026-04-03
+
+### Fixed
+- Removed model deduplication with `@host:port` suffixes since each server now has its own provider entry — models no longer duplicate across providers with different names
+
 ## [1.4.2] - 2026-04-03
 
 ### Fixed

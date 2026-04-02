@@ -43,7 +43,7 @@ $ErrorActionPreference = "Stop"
 # Defaults
 # ============================================================================
 
-$ScriptVersion = "1.4.2"
+$ScriptVersion = "1.4.3"
 $CacheTTL = 86400  # 24 hours
 
 if (-not $LocalOllamaUrl) {
@@ -733,81 +733,7 @@ for ($i = 0; $i -lt $allServers.Count; $i++) {
     foreach ($k in $models.Keys) { $allModels[$k] = $models[$k] }
 }
 
-# Deduplication with server suffixes
-$modelSources = @{}
-foreach ($server in $allServers) {
-    foreach ($m in $server.models.models) {
-        $name = $m.name
-        if (-not $modelSources.ContainsKey($name)) { $modelSources[$name] = @() }
-        $modelSources[$name] += [ordered]@{ "label" = $server.label; "url" = $server.url }
-    }
-}
-
-$dupInfo = @{}
-foreach ($name in @($modelSources.Keys)) {
-    $sources = $modelSources[$name]
-    if ($sources.Count -le 1) { continue }
-
-    # Generate suffixed names
-    $suffixedNames = @()
-    $suffixCounter = @{}
-    foreach ($src in $sources) {
-        try {
-            $uri = [Uri]$src.url
-            $host = $uri.Host
-            $port = $uri.Port
-            if ($port -and $port -notin @(80, 443)) {
-                $suffixBase = "$host`:$port"
-            } else {
-                $suffixBase = $host
-            }
-        } catch {
-            $suffixBase = $src.label
-        }
-
-        if (-not $suffixCounter.ContainsKey($suffixBase)) { $suffixCounter[$suffixBase] = 0 }
-        $suffixCounter[$suffixBase]++
-        $count = $suffixCounter[$suffixBase]
-
-        if ($count -eq 1) { $suffixed = "$name@$suffixBase" } else { $suffixed = "$name@$suffixBase-$count" }
-        $suffixedNames += $suffixed
-    }
-
-    $dupInfo[$name] = $suffixedNames
-
-    # Rename in serverModelMaps and allModels
-    for ($idx = 0; $idx -lt $sources.Count; $idx++) {
-        $suffixedName = $suffixedNames[$idx]
-        $src = $sources[$idx]
-        foreach ($pid in @($serverModelMaps.Keys)) {
-            $pd = $serverModelMaps[$pid]
-            if ($pd.url -eq $src.url -and $pd.models.ContainsKey($name)) {
-                $modelData = [ordered]@{}
-                foreach ($k in $pd.models[$name].Keys) { $modelData[$k] = $pd.models[$name][$k] }
-
-                $info = $modelData._info
-                $suffixDisplay = if ($suffixedName -match "@") { $suffixedName.Split("@", 2)[1] } else { "" }
-                $baseName = $info.display -replace " \([^)]+\)$", ""
-                $modelData["name"] = "$baseName ($suffixDisplay)"
-                $modelData["id"] = $name
-
-                $pd.models.Remove($name)
-                $pd.models[$suffixedName] = $modelData
-
-                if ($allModels.ContainsKey($name)) { $allModels.Remove($name) }
-                $allModels[$suffixedName] = $modelData
-                break
-            }
-        }
-    }
-}
-
-if ($dupInfo.Count -gt 0) {
-    Write-Host "Deduplication: models found on multiple servers:" -ForegroundColor Yellow
-    foreach ($name in $dupInfo.Keys) {
-        Write-Host "  - $name -> $($dupInfo[$name] -join ', ')" -ForegroundColor White
-    }
-}
+# No deduplication needed — each server gets its own provider with its own baseURL.
 
 if ($allModels.Count -eq 0) {
     Write-Warn "No models found after filtering!"
