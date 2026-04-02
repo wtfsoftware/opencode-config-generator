@@ -15,7 +15,7 @@ VERSION="1.2.0"
 # ============================================================================
 
 DEFAULT_OLLAMA="${OLLAMA_HOST:-http://localhost:11434}"
-DEFAULT_OUTPUT="opencode.json"
+DEFAULT_OUTPUT="${HOME}/.config/opencode/opencode.json"
 DEFAULT_NUM_CTX=0
 DEFAULT_MAX_OUTPUT=16384
 CACHE_TTL=86400  # 24 hours in seconds
@@ -85,7 +85,7 @@ OPTIONS:
     -r, --remote URL         Remote server URL (can be specified multiple times)
     -p, --provider NAME      Provider: ollama|lmstudio|vllm|llama-cpp|localai|tgwui|jan|gpt4all
                                (auto-detected by port if not specified)
-    -o, --output FILE        Output file path (default: opencode.json, - for stdout)
+    -o, --output FILE        Output file path (default: ~/.config/opencode/opencode.json, - for stdout)
     -n, --dry-run            Print config to stdout, do not write file
     -i, --interactive        Interactive model selection
         --include PATTERN    Include models matching glob pattern (repeatable)
@@ -123,8 +123,8 @@ EXAMPLES:
     # Interactive selection
     generate_opencode_config.sh -i
 
-    # Only qwen models, no dry-run, write to global config
-    generate_opencode_config.sh --include "qwen*" -o ~/.config/opencode/opencode.json
+    # Only qwen models, write to custom path
+    generate_opencode_config.sh --include "qwen*" -o ./my-config.json
 
     # Preview without writing
     generate_opencode_config.sh -n
@@ -718,7 +718,7 @@ from collections import OrderedDict
 servers_json = os.environ.get("CONFIG_SERVERS_JSON", "[]")
 num_ctx = int(os.environ.get("CONFIG_NUM_CTX", "0"))
 max_output = int(os.environ.get("CONFIG_MAX_OUTPUT", "16384"))
-output_file = os.environ.get("CONFIG_OUTPUT_FILE", "opencode.json")
+output_file = os.environ.get("CONFIG_OUTPUT_FILE", os.path.expanduser("~/.config/opencode/opencode.json"))
 dry_run = os.environ.get("CONFIG_DRY_RUN", "false") == "true"
 no_embed = os.environ.get("CONFIG_NO_EMBED", "true") == "true"
 no_ctx_lookup = os.environ.get("CONFIG_NO_CTX_LOOKUP", "false") == "true"
@@ -1290,8 +1290,7 @@ except Exception as e:
         local out_dir
         out_dir="$(dirname "$OUTPUT_FILE")"
         if [[ ! -d "$out_dir" ]]; then
-            log_error "Output directory does not exist: $out_dir"
-            exit 1
+            mkdir -p "$out_dir"
         fi
         if [[ -f "$OUTPUT_FILE" && ! -w "$OUTPUT_FILE" ]]; then
             log_error "Output file is not writable: $OUTPUT_FILE"

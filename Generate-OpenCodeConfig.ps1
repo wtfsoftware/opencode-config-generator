@@ -10,7 +10,7 @@ param(
     [string]$LocalOllamaUrl = "",
     [string[]]$RemoteOllamaUrl = @(),
     [string]$Provider = "",
-    [string]$OutputFile = "opencode.json",
+    [string]$OutputFile = "$env:USERPROFILE\.config\opencode\opencode.json",
     [switch]$DryRun,
     [switch]$Interactive,
     [string[]]$Include = @(),
@@ -121,7 +121,7 @@ OPTIONS:
     -LocalOllamaUrl URL        Local server URL (default: `$OLLAMA_HOST or http://localhost:11434)
     -RemoteOllamaUrl URL       Remote server URL(s) (can be array)
     -Provider NAME             Provider: ollama|lmstudio|vllm|llama-cpp|localai|tgwui|jan|gpt4all
-    -OutputFile FILE           Output file path (default: opencode.json)
+    -OutputFile FILE           Output file path (default: ~/.config/opencode/opencode.json)
     -DryRun                    Print config to stdout, do not write file
     -Interactive               Interactive model selection
     -Include PATTERN           Include models matching wildcard pattern (array)
@@ -211,8 +211,7 @@ foreach ($rUrl in $RemoteOllamaUrl) {
 if (-not $DryRun) {
     $outDir = Split-Path $OutputFile -Parent
     if ($outDir -and -not (Test-Path $outDir)) {
-        Write-Err "Output directory does not exist: $outDir"
-        exit 1
+        New-Item -Path $outDir -ItemType Directory -Force | Out-Null
     }
     if ((Test-Path $OutputFile) -and -not $Merge -and -not $Force) {
         Write-Warn "File already exists: $OutputFile"
