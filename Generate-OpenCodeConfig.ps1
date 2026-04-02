@@ -573,7 +573,7 @@ function Process-Models {
             $ctx = Get-HardcodedContext -Family $family
         }
         
-        # Add suffix: (local) for local, @host:port for remote
+        # Add suffix: (local) for local, (host:port) for remote
         if ($Label -eq "local") {
             $displayName = "$name (local)"
         } else {
@@ -582,9 +582,9 @@ function Process-Models {
                 $host = $uri.Host
                 $port = $uri.Port
                 $suffix = if ($port -and $port -notin @(80, 443)) { "$host`:$port" } else { $host }
-                $displayName = "$name@$suffix"
+                $displayName = "$name ($suffix)"
             } catch {
-                $displayName = "$name@$Label"
+                $displayName = "$name ($Label)"
             }
         }
         

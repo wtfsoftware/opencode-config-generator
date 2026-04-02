@@ -970,7 +970,7 @@ def process_models(server_data, ctx_map):
             context_length = get_hardcoded_context(family)
             ctx_source = "hardcoded"
 
-        # Add suffix: (local) for local, @host:port for remote
+        # Add suffix: (local) for local, (host:port) for remote
         if label == "local":
             display_name = f"{name} (local)"
         else:
@@ -980,9 +980,9 @@ def process_models(server_data, ctx_map):
                 host = parsed.hostname or label
                 port = parsed.port
                 suffix = f"{host}:{port}" if port and port not in (80, 443) else host
-                display_name = f"{name}@{suffix}"
+                display_name = f"{name} ({suffix})"
             except Exception:
-                display_name = f"{name}@{label}"
+                display_name = f"{name} ({label})"
 
         result[name] = {
             "name": display_name,
