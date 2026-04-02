@@ -43,7 +43,7 @@ $ErrorActionPreference = "Stop"
 # Defaults
 # ============================================================================
 
-$ScriptVersion = "1.3.0"
+$ScriptVersion = "1.4.0"
 $CacheTTL = 86400  # 24 hours
 
 if (-not $LocalOllamaUrl) {
@@ -51,17 +51,6 @@ if (-not $LocalOllamaUrl) {
 }
 
 $EmbedKeywords = @("nomic-bert", "bert", "bert-moe", "embed", "embedding", "jina-embeddings")
-
-$ToolCapableFamilies = @(
-    "qwen2.5", "qwen2.5-coder", "qwen3", "qwen3-coder",
-    "llama3", "llama3.1", "llama3.2", "llama3.3",
-    "mistral", "mistral-nemo", "mixtral",
-    "deepseek-r1", "deepseek-v3",
-    "command-r", "command-r-plus", "command-a",
-    "phi3", "phi4",
-    "gemma2", "gemma3",
-    "granite3", "granite3.1", "granite3.2"
-)
 
 $ToolCapableFamilies = @(
     "qwen2.5", "qwen2.5-coder", "qwen3", "qwen3-coder",
@@ -321,26 +310,104 @@ function Get-AllContextLengths {
     return $result
 }
 
+function Detect-FamilyFromName {
+    param([string]$Name)
+    $nl = $Name.ToLower()
+    if ($nl.Contains("qwen3.5") -or $nl.Contains("qwen35")) { return "qwen3.5" }
+    if ($nl.Contains("qwen3-coder") -or $nl.Contains("qwen3_coder")) { return "qwen3-coder" }
+    if ($nl.Contains("qwen3")) { return "qwen3" }
+    if ($nl.Contains("qwen2.5")) { return "qwen2.5" }
+    if ($nl.Contains("qwen2")) { return "qwen2" }
+    if ($nl.Contains("qwen")) { return "qwen" }
+    if ($nl.Contains("codestral")) { return "codestral" }
+    if ($nl.Contains("mistral-nemo")) { return "mistral-nemo" }
+    if ($nl.Contains("mistral")) { return "mistral" }
+    if ($nl.Contains("mixtral")) { return "mixtral" }
+    if ($nl.Contains("llama3.3")) { return "llama3.3" }
+    if ($nl.Contains("llama3.2")) { return "llama3.2" }
+    if ($nl.Contains("llama3.1")) { return "llama3.1" }
+    if ($nl.Contains("llama3")) { return "llama3" }
+    if ($nl.Contains("llama2")) { return "llama2" }
+    if ($nl.Contains("llama")) { return "llama" }
+    if ($nl.Contains("deepseek-r1")) { return "deepseek-r1" }
+    if ($nl.Contains("deepseek-v3")) { return "deepseek-v3" }
+    if ($nl.Contains("deepseek")) { return "deepseek" }
+    if ($nl.Contains("gemma2")) { return "gemma2" }
+    if ($nl.Contains("gemma")) { return "gemma" }
+    if ($nl.Contains("phi4")) { return "phi4" }
+    if ($nl.Contains("phi3")) { return "phi3" }
+    if ($nl.Contains("phi")) { return "phi" }
+    if ($nl.Contains("command-r-plus")) { return "command-r-plus" }
+    if ($nl.Contains("command-r")) { return "command-r" }
+    if ($nl.Contains("command")) { return "command" }
+    if ($nl.Contains("granite3.2")) { return "granite3.2" }
+    if ($nl.Contains("granite3.1")) { return "granite3.1" }
+    if ($nl.Contains("granite3")) { return "granite3" }
+    if ($nl.Contains("granite")) { return "granite" }
+    if ($nl.Contains("internlm2")) { return "internlm2" }
+    if ($nl.Contains("internlm")) { return "internlm" }
+    if ($nl.Contains("falcon")) { return "falcon" }
+    if ($nl.Contains("starcoder2")) { return "starcoder2" }
+    if ($nl.Contains("starcoder")) { return "starcoder" }
+    if ($nl.Contains("codegemma")) { return "codegemma" }
+    if ($nl.Contains("nemotron")) { return "nemotron" }
+    if ($nl.Contains("jamba")) { return "jamba" }
+    if ($nl.Contains("exaone")) { return "exaone" }
+    if ($nl.Contains("minicpm")) { return "minicpm" }
+    return ""
+}
+
+function Detect-FamilyFromName {
+    param([string]$Name)
+    $nl = $Name.ToLower()
+    if ($nl.Contains("qwen3.5") -or $nl.Contains("qwen35")) { return "qwen3.5" }
+    if ($nl.Contains("qwen3-coder") -or $nl.Contains("qwen3_coder")) { return "qwen3-coder" }
+    if ($nl.Contains("qwen3")) { return "qwen3" }
+    if ($nl.Contains("qwen2.5")) { return "qwen2.5" }
+    if ($nl.Contains("qwen2")) { return "qwen2" }
+    if ($nl.Contains("qwen")) { return "qwen" }
+    if ($nl.Contains("codestral")) { return "codestral" }
+    if ($nl.Contains("mistral-nemo")) { return "mistral-nemo" }
+    if ($nl.Contains("mistral")) { return "mistral" }
+    if ($nl.Contains("mixtral")) { return "mixtral" }
+    if ($nl.Contains("llama3.3")) { return "llama3.3" }
+    if ($nl.Contains("llama3.2")) { return "llama3.2" }
+    if ($nl.Contains("llama3.1")) { return "llama3.1" }
+    if ($nl.Contains("llama3")) { return "llama3" }
+    if ($nl.Contains("llama2")) { return "llama2" }
+    if ($nl.Contains("llama")) { return "llama" }
+    if ($nl.Contains("deepseek-r1")) { return "deepseek-r1" }
+    if ($nl.Contains("deepseek-v3")) { return "deepseek-v3" }
+    if ($nl.Contains("deepseek")) { return "deepseek" }
+    if ($nl.Contains("gemma2")) { return "gemma2" }
+    if ($nl.Contains("gemma")) { return "gemma" }
+    if ($nl.Contains("phi4")) { return "phi4" }
+    if ($nl.Contains("phi3")) { return "phi3" }
+    if ($nl.Contains("phi")) { return "phi" }
+    if ($nl.Contains("command-r-plus")) { return "command-r-plus" }
+    if ($nl.Contains("command-r")) { return "command-r" }
+    if ($nl.Contains("command")) { return "command" }
+    if ($nl.Contains("granite3.2")) { return "granite3.2" }
+    if ($nl.Contains("granite3.1")) { return "granite3.1" }
+    if ($nl.Contains("granite3")) { return "granite3" }
+    if ($nl.Contains("granite")) { return "granite" }
+    if ($nl.Contains("internlm2")) { return "internlm2" }
+    if ($nl.Contains("internlm")) { return "internlm" }
+    if ($nl.Contains("falcon")) { return "falcon" }
+    if ($nl.Contains("starcoder2")) { return "starcoder2" }
+    if ($nl.Contains("starcoder")) { return "starcoder" }
+    if ($nl.Contains("codegemma")) { return "codegemma" }
+    if ($nl.Contains("nemotron")) { return "nemotron" }
+    if ($nl.Contains("jamba")) { return "jamba" }
+    if ($nl.Contains("exaone")) { return "exaone" }
+    if ($nl.Contains("minicpm")) { return "minicpm" }
+    return ""
+}
+
 function Test-IsEmbedModel {
     param([string[]]$Families, [string]$Name)
     $allText = ($Families -join " ").ToLower() + " " + $Name.ToLower()
     foreach ($kw in $EmbedKeywords) {
-        if ($allText.Contains($kw.ToLower())) { return $true }
-    }
-    return $false
-}
-
-function Test-IsToolCapable {
-    param([object]$Model)
-    $caps = $Model.capabilities
-    if ($caps -and $caps.tool_use) { return $true }
-    
-    $families = @($Model.details.families)
-    $family = $Model.details.family
-    $name = $Model.name.ToLower()
-    $allText = (($families + @($family)) -join " ").ToLower() + " " + $name
-    
-    foreach ($kw in $ToolCapableFamilies) {
         if ($allText.Contains($kw.ToLower())) { return $true }
     }
     return $false
@@ -469,6 +536,14 @@ function Process-Models {
         $paramSize = $d.parameter_size
         $quant = $d.quantization_level
         
+        # Fallback: if API family is empty or generic "llama", detect from name
+        if (-not $family -or $family.ToLower() -eq "llama") {
+            $detected = Detect-FamilyFromName -Name $name
+            if ($detected) {
+                $family = $detected
+            }
+        }
+        
         if ($NoEmbed -and (Test-IsEmbedModel -Families ($families + @($family)) -Name $name)) { continue }
         if (-not (Test-MatchesInclude -Name $name -Patterns $Include)) { continue }
         if (Test-MatchesExclude -Name $name -Patterns $Exclude) { continue }
@@ -501,7 +576,7 @@ function Process-Models {
         $displayParts = @()
         if ($family) { $displayParts += ($family.Substring(0,1).ToUpper() + $family.Substring(1)) }
         if ($paramSize) { $displayParts += $paramSize }
-        if ($quant) { $displayParts += $quant }
+        if ($quant -and $quant.ToLower() -ne "unknown") { $displayParts += $quant }
         $displayName = if ($displayParts.Count -gt 0) { ($displayParts -join " ") + " ($Label)" } else { "$name ($Label)" }
         
         $result[$name] = [ordered]@{

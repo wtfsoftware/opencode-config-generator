@@ -163,47 +163,6 @@ adapter_has_rich_metadata() { return 1; }
 adapter_provider_name() { echo ""; }
 adapter_npm_package() { echo "@ai-sdk/openai-compatible"; }
 
-# Load adapter module
-# Args: $1 = provider name
-load_adapter() {
-    local provider="$1"
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-    case "$provider" in
-        ollama)
-            source "${script_dir}/ollama.sh"
-            ;;
-        lmstudio)
-            source "${script_dir}/lmstudio.sh"
-            ;;
-        llama-cpp)
-            source "${script_dir}/llama_cpp.sh"
-            ;;
-        vllm|localai|tgwui|jan|gpt4all|openai-generic)
-            source "${script_dir}/openai_generic.sh"
-            ;;
-        *)
-            log_error "Unknown provider: $provider"
-            log_error "Available: ollama, lmstudio, vllm, llama-cpp, localai, tgwui, jan, gpt4all"
-            return 1
-            ;;
-    esac
-}
-
-# ============================================================================
-# Adapter interface (must be implemented by each adapter)
-# ============================================================================
-# These are placeholder functions that will be overridden by source'd adapter.
-# Each adapter MUST define all of these.
-
-adapter_fetch_models() { echo "ERROR: adapter not loaded"; return 1; }
-adapter_get_context()  { echo ""; }
-adapter_has_rich_metadata() { return 1; }
-adapter_default_port() { echo ""; }
-adapter_provider_name() { echo ""; }
-adapter_npm_package() { echo "@ai-sdk/openai-compatible"; }
-
 # ============================================================================
 # Unified interface (used by main script)
 # ============================================================================

@@ -6,7 +6,7 @@
 
 [English](README.md) | [Русский](README.ru.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | 中文 | [日本語](README.ja.md) | [Português](README.pt.md) | [Italiano](README.it.md) | [한국어](README.ko.md) | [العربية](README.ar.md) | [Nederlands](README.nl.md) | [Українська](README.ua.md)
 
-**v1.3.0** | [规范文档](SPECIFICATION.md) | [开发文档](DEVELOPMENT.md) | [免责声明](DISCLAIMER.md)
+**v1.4.0** | [规范文档](SPECIFICATION.md) | [开发文档](DEVELOPMENT.md) | [免责声明](DISCLAIMER.md)
 
 ## 功能特性
 
@@ -129,7 +129,7 @@
 | `--include PATTERN` | 包含匹配 glob 的模型（可多次指定） | 全部 |
 | `--exclude PATTERN` | 排除匹配 glob 的模型（可多次指定） | 无 |
 | `--with-embed` | 包含 embedding 模型 | 排除 |
-| `--tools-only` | Only models with tool/function calling support | off |
+| `--tools-only` | 仅包含支持 tool/function calling 的模型 | 关 |
 | `--no-context-lookup` | 跳过 `/api/show`，使用硬编码限制 | 关 |
 | `--num-ctx N` | provider options 的 `num_ctx`，0 表示省略 | `0` |
 | `--merge` | 合并到现有配置（仅更新模型） | 关 |
@@ -151,7 +151,7 @@
 | `-Include` | 包含模式（通配符，数组） | 全部 |
 | `-Exclude` | 排除模式（通配符，数组） | 无 |
 | `-WithEmbed` | 包含 embedding 模型 | 排除 |
-| `-ToolsOnly` | Only models with tool/function calling support | off |
+| `-ToolsOnly` | 仅包含支持 tool/function calling 的模型 | 关 |
 | `-NoContextLookup` | 跳过 `/api/show`，使用硬编码限制 | 关 |
 | `-NumCtx` | provider options 的 `num_ctx`，0 表示省略 | `0` |
 | `-Merge` | 合并到现有配置（仅更新模型） | 关 |
@@ -242,6 +242,20 @@ Embedding 模型**默认被排除**，因为它们不支持 chat/tool calling。
 - 模型名称包含这些关键词
 
 使用 `--with-embed` / `-WithEmbed` 来包含它们。
+
+## Tool/Function Calling 过滤器
+
+使用 `--tools-only` / `-ToolsOnly` 仅包含支持 tool/function calling 的模型：
+
+```bash
+./generate_opencode_config.sh --tools-only
+```
+
+检测分两个层级：
+1. **精确检测** — LM Studio 通过 `/api/v1/models` 提供 `capabilities.tool_use`
+2. **启发式检测** — 对于其他提供商，模型会与已知的支持 tool 的系列列表匹配（qwen2.5/3、llama3.x、mistral、mixtral、deepseek-r1/v3、command-r、phi3/4、gemma2/3、granite3.x）
+
+不匹配任一检查的模型在启用 `--tools-only` 时会被排除。该列表可能需要随新模型系列发布而更新。
 
 ## 多提供商支持
 

@@ -2,7 +2,11 @@
 
 Генерирует `opencode.json` для [OpenCode](https://opencode.ai) на основе моделей из локальных и удалённых серверов Ollama.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 [English](README.md) | Русский | [Français](README.fr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | [中文](README.zh.md) | [日本語](README.ja.md) | [Português](README.pt.md) | [Italiano](README.it.md) | [한국어](README.ko.md) | [العربية](README.ar.md) | [Nederlands](README.nl.md) | [Українська](README.ua.md)
+
+**v1.4.0** | [Specification](SPECIFICATION.md) | [Development](DEVELOPMENT.md) | [Disclaimer](DISCLAIMER.md)
 
 ---
 
@@ -12,6 +16,7 @@
 - Автоопределение провайдера по порту или указание через `-p`
 - Автоматическое обнаружение моделей через API провайдера
 - Фильтрация embedding-моделей (nomic-bert, LM Studio type field и др.)
+- Фильтрация моделей по поддержке tool/function calling (`--tools-only`)
 - Точные контекстные окна (Ollama `/api/show`, llama.cpp `/props`, LM Studio rich metadata)
 - Несколько серверов разных провайдеров одновременно
 - Интерактивный выбор моделей с опцией «Все»
@@ -141,7 +146,7 @@
 | `--include PAT` | Включить модели по glob-паттерну (можно несколько) | все |
 | `--exclude PAT` | Исключить модели по glob-паттерну (можно несколько) | нет |
 | `--with-embed` | Включить embedding-модели | исключены |
-| `--tools-only` | Only models with tool/function calling support | off |
+| `--tools-only` | Только модели с поддержкой tool/function calling | выкл |
 | `--no-context-lookup` | Пропустить `/api/show`, использовать хардкод | выкл |
 | `--num-ctx N` | `num_ctx` для провайдера, 0 — не добавлять | `0` |
 | `--merge` | Слить с существующим конфигом | выкл |
@@ -163,7 +168,7 @@
 | `-Include` | Паттерны включения (wildcard) | все |
 | `-Exclude` | Паттерны исключения (wildcard) | нет |
 | `-WithEmbed` | Включить embedding-модели | исключены |
-| `-ToolsOnly` | Only models with tool/function calling support | off |
+| `-ToolsOnly` | Только модели с поддержкой tool/function calling | выкл |
 | `-NoContextLookup` | Пропустить `/api/show` | выкл |
 | `-NumCtx` | `num_ctx` для провайдера | `0` |
 | `-Merge` | Слить с существующим | выкл |
@@ -175,15 +180,97 @@
 
 ## Как это работает
 
-1. **Получение моделей** с каждого сервера Ollama через `GET /api/tags`
+1. **Получение моделей** с каждого сервера через API провайдера
 2. **Фильтрация** embedding-моделей по полю `families`
 3. **Фильтрация** по include/exclude паттернам
-4. **Получение контекста** через `POST /api/show` (параллельно, с кэшированием)
+4. **Получение контекста** через API (параллельно, с кэшированием)
 5. **Дедупликация** моделей с нескольких серверов (суффиксы `@host:port`)
 6. **Интерактивный выбор** (если `-i`): нумерованный список с опцией `[0] Все`
 7. **Слияние** (если `--merge`): сохраняет настройки и другие провайдеры
 8. **Автоопределение small_model**: самая маленькая не-embed модель
 9. **Генерация** `opencode.json`
+
+## Определение контекста
+
+Контекстные окна определяются в следующем порядке приоритета:
+
+1. **API** — точное значение из API провайдера
+2. **Хардкод** — оценка по семейству модели:
+
+| Семейство | Контекст по умолчанию |
+|-----------|:---------------------:|
+| qwen, qwen2 | 32 768 |
+| llama | 8 192 |
+| mistral, mixtral | 32 768 |
+| deepseek | 65 536 |
+| command, command-r | 131 072 |
+| yi | 200 000 |
+| gemma | 8 192 |
+| phi | 4 096 |
+| codestral | 32 768 |
+| granite | 8 192 |
+| другие | 8 192 |
+
+Используйте `--no-context-lookup` для пропуска API-вызовов (быстрее).
+
+## Embedding-модели
+
+Embedding-модели **исключены по умолчанию**, так как не поддерживают chat/tool calling. Определение по:
+
+- Семействам моделей: `nomic-bert`, `bert`, `bert-moe`, `embed`, `embedding`
+- Ключевым словам в имени модели
+
+Используйте `--with-embed` для включения.
+
+## Фильтр tool/function calling
+
+Используйте `--tools-only` для включения только моделей с поддержкой tool/function calling:
+
+```bash
+./generate_opencode_config.sh --tools-only
+```
+
+Определение работает в два этапа:
+1. **Точное** — LM Studio предоставляет `capabilities.tool_use` через `/api/v1/models`
+2. **Эвристическое** — для остальных провайдеров модели сопоставляются со списком известных семейств (qwen2.5/3, llama3.x, mistral, mixtral, deepseek-r1/v3, command-r, phi3/4, gemma2/3, granite3.x)
+
+## Мульти-провайдер
+
+Поддержка 8 локальных инференс-провайдеров. Провайдер определяется по порту автоматически или задаётся через `-p`.
+
+| Провайдер | Порт по умолчанию | Rich Metadata | Авто |
+|-----------|:-----------------:|:-------------:|:----:|
+| **Ollama** | 11434 | `/api/show` (контекст, семейства) | ✅ |
+| **LM Studio** | 1234 | `/api/v1/models` (тип, возможности, контекст) | ✅ |
+| **vLLM** | 8000 | базовые | ✅ |
+| **llama.cpp** | 8080 | `/props` (context_size) | ✅ (как localai) |
+| **LocalAI** | 8080 | базовые | ✅ |
+| **text-generation-webui** | 5000 | базовые | ✅ |
+| **Jan.ai** | 1337 | базовые | ✅ |
+| **GPT4All** | 4891 | базовые | ✅ |
+
+```bash
+# Автоопределение по порту
+./generate_opencode_config.sh -l http://localhost:1234       # LM Studio
+./generate_opencode_config.sh -l http://localhost:8000       # vLLM
+
+# Явный провайдер
+./generate_opencode_config.sh -l http://localhost:8080 -p llama-cpp
+
+# Ollama + LM Studio вместе
+./generate_opencode_config.sh -l http://localhost:11434 -r http://localhost:1234 -p lmstudio
+```
+
+Каждый провайдер — отдельный блок в `opencode.json`:
+
+```json
+{
+  "provider": {
+    "ollama": { "name": "Ollama", "options": { "baseURL": "http://localhost:11434/v1" }, ... },
+    "lmstudio": { "name": "LM Studio", "options": { "baseURL": "http://localhost:1234/v1" }, ... }
+  }
+}
+```
 
 ## Пример конфигурации
 
@@ -212,6 +299,16 @@
   "small_model": "ollama/qwen2.5-coder:3b"
 }
 ```
+
+### Поля
+
+| Поле | Описание |
+|------|----------|
+| `provider.ollama.options.baseURL` | OpenAI-совместимый эндпоинт Ollama |
+| `provider.ollama.models.*.limit.context` | Максимальное окно контекста |
+| `provider.ollama.models.*.limit.output` | Макс. выходных токенов (ограничено 16K) |
+| `model` | Модель по умолчанию (первая доступная) |
+| `small_model` | Самая маленькая модель для лёгких задач (генерация заголовков) |
 
 ## Дедупликация
 
@@ -291,3 +388,9 @@ brew install python3
 - Проверьте families в выводе `ollama show <model>`
 - Используйте `--with-embed` для принудительного включения
 - Используйте `--exclude "*embed*"` для исключения по имени
+
+### «Provider returned error» в OpenCode
+
+- Некоторые модели Ollama не поддерживают tool calling — попробуйте `qwen2.5-coder` или `llama3.2`
+- Увеличьте `num_ctx`, если инструменты не работают: `--num-ctx 32768`
+- Убедитесь, что модель загружена: `ollama run <model>`

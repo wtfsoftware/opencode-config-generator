@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-VERSION="1.3.0"
+VERSION="1.4.0"
 
 # ============================================================================
 # Defaults
@@ -759,17 +759,6 @@ TOOL_CAPABLE_FAMILIES = {
     "granite3", "granite3.1", "granite3.2",
 }
 
-TOOL_CAPABLE_FAMILIES = {
-    "qwen2.5", "qwen2.5-coder", "qwen3", "qwen3-coder",
-    "llama3", "llama3.1", "llama3.2", "llama3.3",
-    "mistral", "mistral-nemo", "mixtral",
-    "deepseek-r1", "deepseek-v3",
-    "command-r", "command-r-plus", "command-a",
-    "phi3", "phi4",
-    "gemma2", "gemma3",
-    "granite3", "granite3.1", "granite3.2",
-}
-
 HARDCODED_CONTEXT = {
     "qwen3": 131072, "qwen2.5": 131072, "qwen2": 32768, "qwen": 32768,
     "llama3": 131072, "llama2": 4096, "llama": 131072,
@@ -786,6 +775,95 @@ HARDCODED_CONTEXT = {
     "nemotron": 131072, "jamba": 256000, "aya": 131072,
     "exaone": 32768, "glm": 131072, "minicpm": 32768,
 }
+
+def detect_family_from_name(name):
+    """Detect model family from model name string as fallback."""
+    nl = name.lower()
+    if "qwen3.5" in nl or "qwen35" in nl:
+        return "qwen3.5"
+    if "qwen3-coder" in nl or "qwen3_coder" in nl:
+        return "qwen3-coder"
+    if "qwen3" in nl:
+        return "qwen3"
+    if "qwen2.5" in nl:
+        return "qwen2.5"
+    if "qwen2" in nl:
+        return "qwen2"
+    if "qwen" in nl:
+        return "qwen"
+    if "codestral" in nl:
+        return "codestral"
+    if "mistral-nemo" in nl:
+        return "mistral-nemo"
+    if "mistral" in nl:
+        return "mistral"
+    if "mixtral" in nl:
+        return "mixtral"
+    if "llama3.3" in nl:
+        return "llama3.3"
+    if "llama3.2" in nl:
+        return "llama3.2"
+    if "llama3.1" in nl:
+        return "llama3.1"
+    if "llama3" in nl:
+        return "llama3"
+    if "llama2" in nl:
+        return "llama2"
+    if "llama" in nl:
+        return "llama"
+    if "deepseek-r1" in nl:
+        return "deepseek-r1"
+    if "deepseek-v3" in nl:
+        return "deepseek-v3"
+    if "deepseek" in nl:
+        return "deepseek"
+    if "gemma2" in nl:
+        return "gemma2"
+    if "gemma" in nl:
+        return "gemma"
+    if "phi4" in nl:
+        return "phi4"
+    if "phi3" in nl:
+        return "phi3"
+    if "phi" in nl:
+        return "phi"
+    if "command-r-plus" in nl:
+        return "command-r-plus"
+    if "command-r" in nl:
+        return "command-r"
+    if "command" in nl:
+        return "command"
+    if "codestral" in nl:
+        return "codestral"
+    if "granite3.2" in nl:
+        return "granite3.2"
+    if "granite3.1" in nl:
+        return "granite3.1"
+    if "granite3" in nl:
+        return "granite3"
+    if "granite" in nl:
+        return "granite"
+    if "internlm2" in nl:
+        return "internlm2"
+    if "internlm" in nl:
+        return "internlm"
+    if "falcon" in nl:
+        return "falcon"
+    if "starcoder2" in nl:
+        return "starcoder2"
+    if "starcoder" in nl:
+        return "starcoder"
+    if "codegemma" in nl:
+        return "codegemma"
+    if "nemotron" in nl:
+        return "nemotron"
+    if "jamba" in nl:
+        return "jamba"
+    if "exaone" in nl:
+        return "exaone"
+    if "minicpm" in nl:
+        return "minicpm"
+    return ""
 
 def parse_param_size(param_str):
     """Parse '3.6B', '475.29M' etc. into a number."""
@@ -863,6 +941,12 @@ def process_models(server_data, ctx_map):
         param_size = details.get("parameter_size", "")
         quant = details.get("quantization_level", "")
 
+        # Fallback: if API family is empty or generic "llama", detect from name
+        if not family or family.lower() == "llama":
+            detected = detect_family_from_name(name)
+            if detected:
+                family = detected
+
         if no_embed and is_embed_model(families + ([family] if family else []), name):
             continue
         if not matches_include(name):
@@ -891,7 +975,7 @@ def process_models(server_data, ctx_map):
             display_parts.append(family.capitalize())
         if param_size:
             display_parts.append(param_size)
-        if quant:
+        if quant and quant.lower() != "unknown":
             display_parts.append(quant)
         display_name = " ".join(display_parts) if display_parts else name
         display_name += f" ({label})"
@@ -1220,8 +1304,6 @@ print("Results:", file=sys.stderr)
 print(f"  Models included:      {total}", file=sys.stderr)
 if skipped_embed > 0:
     print(f"  Embedding filtered:   {skipped_embed}", file=sys.stderr)
-if skipped_no_tools > 0:
-    print(f"  Tools filtered:       {skipped_no_tools}", file=sys.stderr)
 if skipped_no_tools > 0:
     print(f"  Tools filtered:       {skipped_no_tools}", file=sys.stderr)
 if dup_info:

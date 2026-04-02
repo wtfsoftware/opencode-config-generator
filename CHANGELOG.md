@@ -4,10 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.3.0] - 2026-04-02
+## [1.4.0] - 2026-04-03
 
-### Added
-- `--tools-only` — only include models that support tool/function calling (uses `capabilities.tool_use` for LM Studio, heuristic allowlist for others)
+### Fixed
+- Display names no longer include `"unknown"` quantization level when Ollama API returns it
+- Model family detection now falls back to name-based heuristic when API returns empty or generic `"llama"` family (fixes Mistral, Codestral, DeepSeek, etc. being mislabeled as "Llama")
+- Removed duplicate `load_adapter()` function in `adapters/base.sh` that was missing `openai` and `tgi` provider support
+- Removed duplicate `TOOL_CAPABLE_FAMILIES` definition in Bash script
+- Removed duplicate `$ToolCapableFamilies` definition in PowerShell script
+- Removed duplicate `Test-IsToolCapable` function in PowerShell script
+- Removed duplicate "Tools filtered" summary line in Bash script
 
 ## [1.3.0] - 2026-04-02
 
