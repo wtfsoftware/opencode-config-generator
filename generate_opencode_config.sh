@@ -970,14 +970,27 @@ def process_models(server_data, ctx_map):
             context_length = get_hardcoded_context(family)
             ctx_source = "hardcoded"
 
+        # Add @host:port suffix for non-local servers
+        display_name = name
+        if label != "local":
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(server_data.get("url", ""))
+                host = parsed.hostname or label
+                port = parsed.port
+                suffix = f"{host}:{port}" if port and port not in (80, 443) else host
+                display_name = f"{name}@{suffix}"
+            except Exception:
+                display_name = f"{name}@{label}"
+
         result[name] = {
-            "name": name,
+            "name": display_name,
             "limit": {
                 "context": context_length,
                 "output": min(context_length, max_output),
             },
             "_info": {
-                "name": name, "display": name, "family": family,
+                "name": name, "display": display_name, "family": family,
                 "param_size": param_size, "quantization": quant,
                 "context": context_length, "ctx_source": ctx_source,
                 "server_label": label, "server_url": server_data.get("url", ""),

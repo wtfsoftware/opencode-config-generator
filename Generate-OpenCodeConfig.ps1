@@ -573,15 +573,29 @@ function Process-Models {
             $ctx = Get-HardcodedContext -Family $family
         }
         
+        # Add @host:port suffix for non-local servers
+        $displayName = $name
+        if ($Label -ne "local") {
+            try {
+                $uri = [Uri]$ServerUrl
+                $host = $uri.Host
+                $port = $uri.Port
+                $suffix = if ($port -and $port -notin @(80, 443)) { "$host`:$port" } else { $host }
+                $displayName = "$name@$suffix"
+            } catch {
+                $displayName = "$name@$Label"
+            }
+        }
+        
         $result[$name] = [ordered]@{
-            "name"  = $name
+            "name"  = $displayName
             "limit" = [ordered]@{
                 "context" = $ctx
                 "output"  = [Math]::Min($ctx, $MaxOutput)
             }
             "_info" = [ordered]@{
                 "name"         = $name
-                "display"      = $name
+                "display"      = $displayName
                 "family"       = $family
                 "param_size"   = $paramSize
                 "quantization" = $quant
