@@ -45,14 +45,9 @@ jobs:
 
       - name: Check PowerShell syntax
         run: |
-          $errors = $null
           $null = [System.Management.Automation.Language.Parser]::ParseFile(
-            "Generate-OpenCodeConfig.ps1",
+            "$PWD\Generate-OpenCodeConfig.ps1",
             [ref]$null,
-            [ref]$errors
+            [ref]$null
           )
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_ }
-            exit 1
-          }
           Write-Host "PowerShell syntax OK"

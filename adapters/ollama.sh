@@ -5,7 +5,6 @@
 #
 
 adapter_provider_name() { echo "Ollama"; }
-adapter_default_port() { echo "11434"; }
 adapter_npm_package() { echo "@ai-sdk/openai-compatible"; }
 adapter_has_rich_metadata() { return 0; }  # true — Ollama has /api/show
 
@@ -44,21 +43,7 @@ try:
         if 'context_length' in k:
             print(v)
             break
-except:
-    pass
+except Exception as e:
+    print(f'WARN: ollama context parse error: {e}', file=sys.stderr)
 " 2>/dev/null || echo ""
-}
-
-# Check if model is embedding based on families
-# Args: $1 = families (space-separated), $2 = model name
-# Returns: 0 if embedding, 1 if not
-ollama_is_embedding() {
-    local families="$1"
-    local name="$2"
-    local all_text="${families,,} ${name,,}"
-    [[ "$all_text" == *"nomic-bert"* ]] && return 0
-    [[ "$all_text" == *"bert"* && "$all_text" != *"albert"* ]] && return 0
-    [[ "$all_text" == *"embed"* ]] && return 0
-    [[ "$all_text" == *"jina-embeddings"* ]] && return 0
-    return 1
 }

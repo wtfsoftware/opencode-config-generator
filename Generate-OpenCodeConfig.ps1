@@ -9,6 +9,7 @@
 param(
     [string]$LocalOllamaUrl = "",
     [string[]]$RemoteOllamaUrl = @(),
+    [string]$Provider = "",
     [string]$OutputFile = "opencode.json",
     [switch]$DryRun,
     [switch]$Interactive,
@@ -17,19 +18,31 @@ param(
     [switch]$WithEmbed,
     [switch]$NoContextLookup,
     [int]$NumCtx = 0,
+    [int]$MaxOutput = 16384,
     [switch]$Merge,
+    [switch]$Force,
+    [switch]$Diff,
     [string]$DefaultModel = "",
     [string]$SmallModel = "",
+    [string]$MaxSize = "",
+    [string]$MinSize = "",
+    [string]$Sort = "",
+    [int]$Limit = 0,
     [switch]$NoCache,
+    [switch]$NoColor,
+    [switch]$Quiet,
+    [string]$Check = "",
     [switch]$Version,
     [switch]$Help
 )
+
+$ErrorActionPreference = "Stop"
 
 # ============================================================================
 # Defaults
 # ============================================================================
 
-$ScriptVersion = "1.1.0"
+$ScriptVersion = "1.2.0"
 $CacheTTL = 86400  # 24 hours
 
 if (-not $LocalOllamaUrl) {
@@ -39,34 +52,64 @@ if (-not $LocalOllamaUrl) {
 $EmbedKeywords = @("nomic-bert", "bert", "bert-moe", "embed", "embedding", "jina-embeddings")
 
 $HardcodedContext = @{
-    "qwen"       = 32768
-    "llama"      = 8192
-    "mistral"    = 32768
-    "mixtral"    = 32768
-    "deepseek"   = 65536
-    "gemma"      = 8192
-    "phi"        = 4096
-    "command"    = 131072
-    "yi"         = 200000
-    "codestral"  = 32768
-    "command-r"  = 131072
-    "granite"    = 8192
-    "internlm"   = 32768
-    "falcon"     = 8192
-    "orca"       = 4096
-    "neural-chat"= 4096
-    "starcoder"  = 8192
-    "codegemma"  = 8192
+    "qwen3"       = 131072
+    "qwen2.5"     = 131072
+    "qwen2"       = 32768
+    "qwen"        = 32768
+    "llama3"      = 131072
+    "llama2"      = 4096
+    "llama"       = 131072
+    "mistral-nemo"= 131072
+    "mistral"     = 32768
+    "mixtral"     = 32768
+    "deepseek-r1" = 131072
+    "deepseek-v3" = 131072
+    "deepseek"    = 65536
+    "gemma2"      = 8192
+    "gemma"       = 8192
+    "phi4"        = 16384
+    "phi3"        = 131072
+    "phi"         = 4096
+    "command-a"   = 131072
+    "command-r-plus" = 131072
+    "command-r"   = 131072
+    "command"     = 131072
+    "yi"          = 200000
+    "codestral"   = 32768
+    "granite3"    = 131072
+    "granite"     = 8192
+    "internlm2"   = 32768
+    "internlm"    = 32768
+    "falcon"      = 8192
+    "orca"        = 4096
+    "neural-chat" = 4096
+    "starcoder2"  = 16384
+    "starcoder"   = 8192
+    "codegemma"   = 8192
+    "nemotron"    = 131072
+    "jamba"       = 256000
+    "aya"         = 131072
+    "exaone"      = 32768
+    "glm"         = 131072
+    "minicpm"     = 32768
 }
 
 # ============================================================================
 # Helpers
 # ============================================================================
 
-function Write-Info  { param($m) Write-Host "[INFO] $m" -ForegroundColor Green }
-function Write-Warn  { param($m) Write-Host "[WARN] $m" -ForegroundColor Yellow }
-function Write-Err   { param($m) Write-Host "[ERROR] $m" -ForegroundColor Red }
-function Write-Step  { param($m) Write-Host "[STEP] $m" -ForegroundColor Cyan }
+$IsTerminal = [System.Console]::IsOutputRedirected -eq $false
+if ($NoColor -or -not $IsTerminal) {
+    function Write-Info  { param($m) if (-not $Quiet) { Write-Host "[INFO] $m" } }
+    function Write-Warn  { param($m) Write-Host "[WARN] $m" }
+    function Write-Err   { param($m) Write-Host "[ERROR] $m" }
+    function Write-Step  { param($m) if (-not $Quiet) { Write-Host "[STEP] $m" } }
+} else {
+    function Write-Info  { param($m) if (-not $Quiet) { Write-Host "[INFO] $m" -ForegroundColor Green } }
+    function Write-Warn  { param($m) Write-Host "[WARN] $m" -ForegroundColor Yellow }
+    function Write-Err   { param($m) Write-Host "[ERROR] $m" -ForegroundColor Red }
+    function Write-Step  { param($m) if (-not $Quiet) { Write-Host "[STEP] $m" -ForegroundColor Cyan } }
+}
 
 function Show-Help {
     @"
@@ -75,8 +118,9 @@ Usage: Generate-OpenCodeConfig.ps1 [OPTIONS]
 Generates opencode.json configuration from Ollama models.
 
 OPTIONS:
-    -LocalOllamaUrl URL        Local Ollama URL (default: `$OLLAMA_HOST or http://localhost:11434)
-    -RemoteOllamaUrl URL       Remote Ollama server URL(s) (can be array)
+    -LocalOllamaUrl URL        Local server URL (default: `$OLLAMA_HOST or http://localhost:11434)
+    -RemoteOllamaUrl URL       Remote server URL(s) (can be array)
+    -Provider NAME             Provider: ollama|lmstudio|vllm|llama-cpp|localai|tgwui|jan|gpt4all
     -OutputFile FILE           Output file path (default: opencode.json)
     -DryRun                    Print config to stdout, do not write file
     -Interactive               Interactive model selection
@@ -85,28 +129,71 @@ OPTIONS:
     -WithEmbed                 Include embedding models (excluded by default)
     -NoContextLookup           Skip /api/show calls, use hardcoded context limits
     -NumCtx N                  num_ctx for Ollama provider, 0 to omit (default: 0)
+    -MaxOutput N               Max output tokens cap (default: 16384)
     -Merge                     Merge into existing opencode.json (update models only)
+    -Force                     Overwrite output file without prompting
+    -Diff                      Show diff between old and new config (with -Merge)
     -DefaultModel ID           Set default model explicitly (e.g. qwen2.5-coder:7b)
     -SmallModel ID             Set small model explicitly (for title generation)
+    -MaxSize SIZE              Exclude models larger than SIZE (e.g. 7B, 13B)
+    -MinSize SIZE              Exclude models smaller than SIZE (e.g. 1B)
+    -Sort ORDER                Sort models: name, size, family (default: api order)
+    -Limit N                   Limit output to N models
     -NoCache                   Disable context lookup cache
+    -NoColor                   Disable colored output
+    -Quiet                     Suppress non-error output
+    -Check FILE                Validate an existing opencode.json file
     -Version                   Show version
     -Help                      Show this help
-
-EXAMPLES:
-    .\Generate-OpenCodeConfig.ps1
-    .\Generate-OpenCodeConfig.ps1 -RemoteOllamaUrl "http://192.168.1.100:11434"
-    .\Generate-OpenCodeConfig.ps1 -RemoteOllamaUrl "http://gpu1:11434","http://gpu2:11434"
-    .\Generate-OpenCodeConfig.ps1 -Interactive
-    .\Generate-OpenCodeConfig.ps1 -Include "qwen*"
-    .\Generate-OpenCodeConfig.ps1 -DryRun
-    .\Generate-OpenCodeConfig.ps1 -WithEmbed
-    .\Generate-OpenCodeConfig.ps1 -NumCtx 32768
 "@
     exit 0
 }
 
 if ($Help) { Show-Help }
 if ($Version) { Write-Host "Generate-OpenCodeConfig.ps1 v$ScriptVersion"; exit 0 }
+
+# Check mode
+if ($Check) {
+    if (-not (Test-Path $Check)) {
+        Write-Err "File not found: $Check"
+        exit 1
+    }
+    try {
+        $config = Get-Content $Check -Raw | ConvertFrom-Json -AsHashtable
+        $errors = @()
+        if (-not $config.ContainsKey('$schema')) { $errors += "Missing `$schema" }
+        if (-not $config.ContainsKey('provider')) { $errors += "Missing provider" }
+        if (-not $config.ContainsKey('model')) { $errors += "Missing model" }
+        foreach ($pid in $config.provider.Keys) {
+            $pdata = $config.provider[$pid]
+            if (-not $pdata.ContainsKey('models')) { $errors += "Provider $pid has no models" }
+            if (-not $pdata.ContainsKey('options') -or -not $pdata.options.ContainsKey('baseURL')) {
+                $errors += "Provider $pid missing baseURL"
+            }
+        }
+        $modelRef = $config.model
+        if ($modelRef -match '^(.+?)/(.+)$') {
+            $provId = $Matches[1]; $modelId = $Matches[2]
+            if ($config.provider.ContainsKey($provId)) {
+                if (-not $config.provider[$provId].models.ContainsKey($modelId)) {
+                    $errors += "Default model $modelRef not found in provider models"
+                }
+            }
+        }
+        if ($errors.Count -gt 0) {
+            Write-Err "INVALID: $Check"
+            foreach ($e in $errors) { Write-Err "  - $e" }
+            exit 1
+        } else {
+            $modelCount = ($config.provider.Values | ForEach-Object { $_.models.Count } | Measure-Object -Sum).Sum
+            Write-Host "VALID: $Check ($modelCount models, $($config.provider.Count) providers)"
+            exit 0
+        }
+    } catch {
+        Write-Err "INVALID JSON: $_"
+        exit 1
+    }
+}
 
 # Validate URLs
 if ($LocalOllamaUrl -and $LocalOllamaUrl -notmatch "^https?://") {
@@ -117,6 +204,28 @@ foreach ($rUrl in $RemoteOllamaUrl) {
     if ($rUrl -notmatch "^https?://") {
         Write-Err "Invalid URL: $rUrl (must start with http:// or https://)"
         exit 1
+    }
+}
+
+# Early write permission check
+if (-not $DryRun) {
+    $outDir = Split-Path $OutputFile -Parent
+    if ($outDir -and -not (Test-Path $outDir)) {
+        Write-Err "Output directory does not exist: $outDir"
+        exit 1
+    }
+    if ((Test-Path $OutputFile) -and -not $Merge -and -not $Force) {
+        Write-Warn "File already exists: $OutputFile"
+        if ([System.Console]::IsInputRedirected -eq $false) {
+            $confirm = Read-Host "Overwrite? (y/N)"
+            if ($confirm -notmatch '^[yY]') {
+                Write-Info "Aborted."
+                exit 0
+            }
+        } else {
+            Write-Err "File already exists: $OutputFile (use -Force to overwrite)"
+            exit 1
+        }
     }
 }
 
@@ -201,10 +310,26 @@ function Test-IsEmbedModel {
 function Get-HardcodedContext {
     param([string]$Family)
     $fl = $Family.ToLower()
-    foreach ($key in $HardcodedContext.Keys) {
+    # Sort by key length descending for more specific matches first
+    $sortedKeys = $HardcodedContext.Keys | Sort-Object { $_.Length } -Descending
+    foreach ($key in $sortedKeys) {
         if ($fl.Contains($key)) { return $HardcodedContext[$key] }
     }
     return 8192
+}
+
+function Parse-ParamSize {
+    param([string]$ParamStr)
+    try {
+        $ps = $ParamStr.ToUpper().Trim()
+        $mult = 1
+        if ($ps.Contains("B")) { $mult = 1000000000 }
+        elseif ($ps.Contains("M")) { $mult = 1000000 }
+        $val = [double]($ps.Replace("B","").Replace("M","").Trim())
+        return $val * $mult
+    } catch {
+        return [double]::MaxValue
+    }
 }
 
 function Test-MatchesInclude {
@@ -240,7 +365,8 @@ function Select-ModelsInteractive {
         $family = if ($d.family) { $d.family.Substring(0,1).ToUpper() + $d.family.Substring(1) } else { "?" }
         $param = $d.parameter_size
         $quant = $d.quantization_level
-        Write-Host "  [$i] $name  $family $param $quant" -ForegroundColor White
+        $ctx = if ($m.context) { $m.context } else { "?" }
+        Write-Host "  [$i] $name  $family $param $quant ctx=$ctx" -ForegroundColor White
         $i++
     }
     
@@ -268,7 +394,8 @@ function Process-Models {
     param(
         [object]$ModelsData,
         [string]$Label,
-        [hashtable]$CtxMap
+        [hashtable]$CtxMap,
+        [string]$ServerUrl = ""
     )
     
     $result = [ordered]@{}
@@ -291,6 +418,19 @@ function Process-Models {
         if (-not (Test-MatchesInclude -Name $name -Patterns $Include)) { continue }
         if (Test-MatchesExclude -Name $name -Patterns $Exclude) { continue }
         
+        # Size filtering
+        if ($paramSize -and ($MaxSize -or $MinSize)) {
+            $ps = Parse-ParamSize -ParamStr $paramSize
+            if ($MaxSize) {
+                $maxVal = Parse-ParamSize -ParamStr $MaxSize
+                if ($ps -gt $maxVal) { continue }
+            }
+            if ($MinSize) {
+                $minVal = Parse-ParamSize -ParamStr $MinSize
+                if ($ps -lt $minVal) { continue }
+            }
+        }
+        
         $ctx = $null
         $ctxSource = "hardcoded"
         
@@ -312,15 +452,18 @@ function Process-Models {
             "name"  = $displayName
             "limit" = [ordered]@{
                 "context" = $ctx
-                "output"  = [Math]::Min($ctx, 16384)
+                "output"  = [Math]::Min($ctx, $MaxOutput)
             }
             "_info" = [ordered]@{
-                "name"       = $name
-                "family"     = $family
-                "param_size" = $paramSize
+                "name"         = $name
+                "display"      = $displayName
+                "family"       = $family
+                "param_size"   = $paramSize
                 "quantization" = $quant
-                "context"    = $ctx
-                "ctx_source" = $ctxSource
+                "context"      = $ctx
+                "ctx_source"   = $ctxSource
+                "server_label" = $Label
+                "server_url"   = $ServerUrl
             }
         }
     }
@@ -348,30 +491,71 @@ Write-Host ""
 # Build server list
 $allServers = @()
 
+# Provider display names
+$ProviderDisplay = @{
+    "ollama" = "Ollama"; "lmstudio" = "LM Studio"; "vllm" = "vLLM"
+    "llama-cpp" = "llama.cpp"; "localai" = "LocalAI"; "tgwui" = "text-generation-webui"
+    "jan" = "Jan.ai"; "gpt4all" = "GPT4All"; "openai-generic" = "OpenAI-compatible"
+    "openai" = "OpenAI"; "tgi" = "TGI"
+}
+
+# Auto-detect provider from port
+function Detect-Provider {
+    param([string]$Url)
+    try {
+        $uri = [Uri]$Url
+        $port = $uri.Port
+    } catch { $port = 0 }
+    switch ($port) {
+        11434 { "ollama" }
+        1234  { "lmstudio" }
+        8000  { "vllm" }
+        5000  { "tgwui" }
+        1337  { "jan" }
+        4891  { "gpt4all" }
+        8080  {
+            Write-Warn "Port 8080 detected — defaulting to LocalAI. Use -Provider llama-cpp or -Provider tgi if needed."
+            "localai"
+        }
+        default { "openai-generic" }
+    }
+}
+
+# Determine local provider
+$localProvider = if ($Provider) { $Provider } else { Detect-Provider -Url $LocalOllamaUrl }
+
 # Local
-$localModels = Get-OllamaModels -Url $LocalOllamaUrl -Label "local Ollama"
+$localModels = Get-OllamaModels -Url $LocalOllamaUrl -Label "local $localProvider"
 if ($localModels) {
     if ($Interactive) {
-        $localModels.models = Select-ModelsInteractive -ModelsData $localModels.models -Label "local Ollama"
+        $localModels.models = Select-ModelsInteractive -ModelsData $localModels.models -Label "local $localProvider"
     }
     $allServers += [ordered]@{
-        "url"    = $LocalOllamaUrl
-        "label"  = "local"
-        "models" = $localModels
+        "url"      = $LocalOllamaUrl
+        "label"    = "local"
+        "provider" = $localProvider
+        "models"   = $localModels
     }
 }
 
 # Remote
 foreach ($rUrl in $RemoteOllamaUrl) {
-    $rModels = Get-OllamaModels -Url $rUrl -Label "remote Ollama ($rUrl)"
+    # Apply explicit -Provider to remotes if there's only one remote, otherwise auto-detect
+    if ($Provider -and $RemoteOllamaUrl.Count -eq 1) {
+        $rProvider = $Provider
+    } else {
+        $rProvider = Detect-Provider -Url $rUrl
+    }
+    $rModels = Get-OllamaModels -Url $rUrl -Label "remote $rProvider ($rUrl)"
     if (-not $rModels) { continue }
     if ($Interactive) {
-        $rModels.models = Select-ModelsInteractive -ModelsData $rModels.models -Label "remote Ollama ($rUrl)"
+        $rModels.models = Select-ModelsInteractive -ModelsData $rModels.models -Label "remote $rProvider ($rUrl)"
     }
     $allServers += [ordered]@{
-        "url"    = $rUrl
-        "label"  = "remote"
-        "models" = $rModels
+        "url"      = $rUrl
+        "label"    = "remote"
+        "provider" = $rProvider
+        "models"   = $rModels
     }
 }
 
@@ -401,16 +585,18 @@ for ($i = 0; $i -lt $allServers.Count; $i++) {
     $server = $allServers[$i]
     $ctxMap = if ($allCtxMaps.ContainsKey($server.url)) { $allCtxMaps[$server.url] } else { @{} }
     
-    $models = Process-Models -ModelsData $server.models -Label $server.label -CtxMap $ctxMap
+    $models = Process-Models -ModelsData $server.models -Label $server.label -CtxMap $ctxMap -ServerUrl $server.url
     
-    if ($allServers.Count -eq 1) { $pid = "ollama" }
-    elseif ($i -eq 0) { $pid = "ollama" }
-    else { $pid = "ollama-$($i + 1)" }
+    $provType = $server.provider
+    if ($allServers.Count -eq 1) { $pid = $provType }
+    elseif ($i -eq 0) { $pid = $provType }
+    else { $pid = "$provType-$($i + 1)" }
     
     $serverModelMaps[$pid] = [ordered]@{
-        "url"    = $server.url
-        "label"  = $server.label
-        "models" = $models
+        "url"      = $server.url
+        "label"    = $server.label
+        "provider" = $provType
+        "models"   = $models
     }
     
     foreach ($k in $models.Keys) { $allModels[$k] = $models[$k] }
@@ -498,6 +684,34 @@ if ($allModels.Count -eq 0) {
     if (-not $WithEmbed) { Write-Warn "  - Try -WithEmbed to include embedding models" }
 }
 
+# Sort
+if ($Sort -eq "name") {
+    $sorted = [ordered]@{}
+    foreach ($k in ($allModels.Keys | Sort-Object)) { $sorted[$k] = $allModels[$k] }
+    $allModels = $sorted
+} elseif ($Sort -eq "size") {
+    $sorted = [ordered]@{}
+    foreach ($k in ($allModels.Keys | Sort-Object { Parse-ParamSize $allModels[$_]._info.param_size })) { $sorted[$k] = $allModels[$k] }
+    $allModels = $sorted
+} elseif ($Sort -eq "family") {
+    $sorted = [ordered]@{}
+    foreach ($k in ($allModels.Keys | Sort-Object { $allModels[$k]._info.family })) { $sorted[$k] = $allModels[$k] }
+    $allModels = $sorted
+}
+
+# Limit
+if ($Limit -gt 0 -and $allModels.Count -gt $Limit) {
+    Write-Info "Limit: keeping $Limit of $($allModels.Count) models"
+    $limited = [ordered]@{}
+    $i = 0
+    foreach ($k in $allModels.Keys) {
+        if ($i -ge $Limit) { break }
+        $limited[$k] = $allModels[$k]
+        $i++
+    }
+    $allModels = $limited
+}
+
 # Build provider config
 $providerConfig = [ordered]@{}
 
@@ -510,15 +724,19 @@ $clean = {
     return $c
 }
 
+# Determine first provider type from servers
+$firstProvType = if ($allServers.Count -gt 0) { $allServers[0].provider } else { "ollama" }
+$firstProvDisplay = if ($ProviderDisplay.ContainsKey($firstProvType)) { $ProviderDisplay[$firstProvType] } else { $firstProvType }
+
 if ($allServers.Count -eq 1) {
-    $providerConfig["ollama"] = [ordered]@{
+    $providerConfig[$firstProvType] = [ordered]@{
         "npm"     = "@ai-sdk/openai-compatible"
-        "name"    = "Ollama"
+        "name"    = $firstProvDisplay
         "options" = (Make-ProviderOptions -Url $allServers[0].url)
         "models"  = [ordered]@{}
     }
     foreach ($k in $allModels.Keys) {
-        $providerConfig["ollama"]["models"][$k] = & $clean $allModels[$k]
+        $providerConfig[$firstProvType]["models"][$k] = & $clean $allModels[$k]
     }
 }
 else {
@@ -529,23 +747,24 @@ else {
         }
     }
     
-    $providerConfig["ollama"] = [ordered]@{
+    $providerConfig[$firstProvType] = [ordered]@{
         "npm"     = "@ai-sdk/openai-compatible"
-        "name"    = "Ollama"
+        "name"    = $firstProvDisplay
         "options" = (Make-ProviderOptions -Url $allServers[0].url)
         "models"  = $combined
     }
     
     foreach ($pid in $serverModelMaps.Keys) {
-        if ($pid -eq "ollama") { continue }
+        if ($pid -eq $firstProvType) { continue }
         $pdata = $serverModelMaps[$pid]
         $pm = [ordered]@{}
         foreach ($k in $pdata.models.Keys) {
             $pm[$k] = & $clean $pdata.models[$k]
         }
+        $provDisplay = if ($ProviderDisplay.ContainsKey($pdata.provider)) { $ProviderDisplay[$pdata.provider] } else { $pdata.provider }
         $providerConfig[$pid] = [ordered]@{
             "npm"     = "@ai-sdk/openai-compatible"
-            "name"    = "Ollama ($($pdata.label))"
+            "name"    = "$provDisplay ($($pdata.label))"
             "options" = (Make-ProviderOptions -Url $pdata.url)
             "models"  = $pm
         }
@@ -603,13 +822,14 @@ if ($smallModel -eq $firstModel) {
 }
 
 # Build final config
+$firstProvId = if ($providerConfig.Count -gt 0) { $providerConfig.Keys | Select-Object -First 1 } else { "ollama" }
 $config = [ordered]@{
     "`$schema" = "https://opencode.ai/config.json"
     "provider" = $providerConfig
-    "model"    = "ollama/$firstModel"
+    "model"    = "$firstProvId/$firstModel"
 }
 if ($smallModel -ne $firstModel) {
-    $config["small_model"] = "ollama/$smallModel"
+    $config["small_model"] = "$firstProvId/$smallModel"
 }
 
 # Merge: load existing config and keep non-provider keys
@@ -639,9 +859,30 @@ if ($Merge -and (Test-Path $OutputFile)) {
 }
 
 # Output
-$jsonStr = $config | ConvertTo-Json -Depth 20
+$jsonStr = $config | ConvertTo-Json -Depth 50
 
-if ($DryRun) {
+# Diff mode
+if ($Diff -and $existing) {
+    $existingStr = $existing | ConvertTo-Json -Depth 50
+    Write-Host "=== DIFF: old -> new ===" -ForegroundColor Cyan
+    $oldLines = $existingStr -split "`n"
+    $newLines = $jsonStr -split "`n"
+    $diffResult = Compare-Object $oldLines $newLines
+    if ($diffResult) {
+        foreach ($d in $diffResult) {
+            if ($d.SideIndicator -eq "=>") {
+                Write-Host "+ $($d.InputObject)" -ForegroundColor Green
+            } else {
+                Write-Host "- $($d.InputObject)" -ForegroundColor Red
+            }
+        }
+    } else {
+        Write-Host "No changes."
+    }
+    Write-Host ""
+}
+
+if ($DryRun -or $OutputFile -eq "-") {
     Write-Host $jsonStr
 }
 else {

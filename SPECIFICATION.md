@@ -2,7 +2,7 @@
 
 ## OpenCode Config Generator for Ollama — Technical Specification
 
-**Version:** 1.1.0  
+**Version:** 1.2.0  
 **Status:** Stable  
 **License:** MIT
 
@@ -135,14 +135,21 @@ Server URL → detect_provider() → load_adapter() → adapter_fetch_models()
 
 | Family | Context | Family | Context |
 |--------|---------|--------|---------|
-| qwen, qwen2 | 32,768 | gemma | 8,192 |
-| llama | 8,192 | phi | 4,096 |
-| mistral, mixtral | 32,768 | command, command-r | 131,072 |
-| deepseek | 65,536 | yi | 200,000 |
-| codestral | 32,768 | granite | 8,192 |
-| internlm | 32,768 | falcon | 8,192 |
-| orca | 4,096 | neural-chat | 4,096 |
-| starcoder | 8,192 | codegemma | 8,192 |
+| qwen3 | 131,072 | gemma2 | 8,192 |
+| qwen2.5 | 131,072 | gemma | 8,192 |
+| qwen2 | 32,768 | phi4 | 16,384 |
+| qwen | 32,768 | phi3 | 131,072 |
+| llama3 | 131,072 | phi | 4,096 |
+| llama2 | 4,096 | command-a | 131,072 |
+| llama | 131,072 | command-r-plus | 131,072 |
+| mistral | 32,768 | command-r | 131,072 |
+| mistral-nemo | 131,072 | yi | 200,000 |
+| mixtral | 32,768 | codestral | 32,768 |
+| deepseek-r1 | 131,072 | granite3 | 131,072 |
+| deepseek-v3 | 131,072 | granite | 8,192 |
+| deepseek | 65,536 | internlm2 | 32,768 |
+| nemotron | 131,072 | jamba | 256,000 |
+| starcoder2 | 16,384 | starcoder | 8,192 |
 
 ---
 
@@ -166,7 +173,7 @@ Server URL → detect_provider() → load_adapter() → adapter_fetch_models()
           "name": "Display Name (server)",         // human-readable
           "limit": {
             "context": 32768,                      // max context window
-            "output": 16384                        // max output (capped at 16K)
+            "output": 16384                        // max output (--max-output, default 16K)
           }
         }
       }
@@ -236,6 +243,7 @@ Both scripts support identical flags (adapted for platform conventions):
 |------|------------|------|---------|
 | `-l, --local URL` | `-LocalOllamaUrl` | string | `$OLLAMA_HOST` or `http://localhost:11434` |
 | `-r, --remote URL` | `-RemoteOllamaUrl` | string[] | `[]` |
+| `-p, --provider NAME` | `-Provider` | string | auto-detected |
 | `-o, --output FILE` | `-OutputFile` | string | `opencode.json` |
 | `-n, --dry-run` | `-DryRun` | flag | off |
 | `-i, --interactive` | `-Interactive` | flag | off |
@@ -244,10 +252,20 @@ Both scripts support identical flags (adapted for platform conventions):
 | `--with-embed` | `-WithEmbed` | flag | off |
 | `--no-context-lookup` | `-NoContextLookup` | flag | off |
 | `--num-ctx N` | `-NumCtx` | int | 0 |
+| `--max-output N` | `-MaxOutput` | int | 16384 |
 | `--merge` | `-Merge` | flag | off |
+| `--force` | `-Force` | flag | off |
+| `--diff` | `-Diff` | flag | off |
 | `--default-model ID` | `-DefaultModel` | string | auto |
 | `--small-model ID` | `-SmallModel` | string | auto |
+| `--max-size SIZE` | `-MaxSize` | string | (none) |
+| `--min-size SIZE` | `-MinSize` | string | (none) |
+| `--sort ORDER` | `-Sort` | string | (api order) |
+| `--limit N` | `-Limit` | int | 0 (no limit) |
 | `--no-cache` | `-NoCache` | flag | off |
+| `--no-color` | `-NoColor` | flag | off |
+| `--quiet` | `-Quiet` | flag | off |
+| `--check FILE` | `-Check` | string | (none) |
 | `-v, --version` | `-Version` | flag | off |
 | `-h, --help` | `-Help` | flag | off |
 
@@ -344,6 +362,23 @@ print('PASS: all assertions')
 ---
 
 ## 11. Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full changelog.
+
+### v1.2.0
+- `--max-size`/`--min-size` model size filtering
+- `--sort name|size|family`, `--limit N`
+- `--max-output N` configurable output cap
+- `--check FILE` config validation mode
+- `--diff` show changes with `--merge`
+- `--force` overwrite without prompt
+- `--no-color`, `--quiet` output control
+- `-p`/`-Provider` PowerShell parity
+- OpenAI API and TGI adapters
+- Updated hardcoded context for modern models (llama3=128K, phi3=128K, etc.)
+- Batched cache lookup (10x faster)
+- Early write permission check
+- Non-TTY color auto-disable
 
 ### v1.1.0
 - Added `--version`, `--small-model`, URL validation

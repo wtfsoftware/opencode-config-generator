@@ -5,7 +5,6 @@
 #
 
 adapter_provider_name() { echo "LM Studio"; }
-adapter_default_port() { echo "1234"; }
 adapter_npm_package() { echo "@ai-sdk/openai-compatible"; }
 adapter_has_rich_metadata() { return 0; }  # true — has /api/v1/models
 
@@ -36,23 +35,11 @@ try:
         caps = m.get('capabilities', {})
         ctx = m.get('context_length', m.get('max_context_length', 8192))
 
-        # Determine family from model path/name
-        family = ''
-        name_lower = model_id.lower()
-        if 'llama' in name_lower: family = 'llama'
-        elif 'qwen' in name_lower: family = 'qwen'
-        elif 'mistral' in name_lower: family = 'mistral'
-        elif 'phi' in name_lower: family = 'phi'
-        elif 'gemma' in name_lower: family = 'gemma'
-        elif 'deepseek' in name_lower: family = 'deepseek'
-
-        families = [family] if family else []
-
         result.append({
             'name': model_id,
             'details': {
-                'family': family,
-                'families': families,
+                'family': '',
+                'families': [],
                 'parameter_size': m.get('params_string', ''),
                 'quantization_level': m.get('quantization', '')
             },
@@ -62,6 +49,7 @@ try:
         })
     print(json.dumps({'models': result}))
 except Exception as e:
+    print(f'WARN: lmstudio rich parse error: {e}', file=sys.stderr)
     print(json.dumps({'models': []}))
 " 2>/dev/null
         return
@@ -83,21 +71,12 @@ try:
         model_id = m.get('id', '')
         if not model_id:
             continue
-        # Heuristic family detection
-        family = ''
-        name_lower = model_id.lower()
-        if 'llama' in name_lower: family = 'llama'
-        elif 'qwen' in name_lower: family = 'qwen'
-        elif 'mistral' in name_lower: family = 'mistral'
-        elif 'phi' in name_lower: family = 'phi'
-        elif 'gemma' in name_lower: family = 'gemma'
-        elif 'deepseek' in name_lower: family = 'deepseek'
 
         result.append({
             'name': model_id,
             'details': {
-                'family': family,
-                'families': [family] if family else [],
+                'family': '',
+                'families': [],
                 'parameter_size': '',
                 'quantization_level': ''
             },
@@ -106,6 +85,7 @@ try:
         })
     print(json.dumps({'models': result}))
 except Exception as e:
+    print(f'WARN: lmstudio basic parse error: {e}', file=sys.stderr)
     print(json.dumps({'models': []}))
 " 2>/dev/null
     else
@@ -116,13 +96,4 @@ except Exception as e:
 # LM Studio doesn't have per-model context endpoint
 adapter_get_context() {
     echo ""
-}
-
-# Check if model is embedding (LM Studio has explicit type field)
-lmstudio_is_embedding() {
-    local model_type="$1"
-    local name="$2"
-    [[ "$model_type" == "embedding" ]] && return 0
-    [[ "${name,,}" == *"embed"* ]] && return 0
-    return 1
 }

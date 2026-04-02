@@ -1,45 +1,32 @@
 #!/bin/bash
 #
-# llama.cpp server adapter for OpenCode Config Generator
-# Endpoints: GET /v1/models, GET /props (context_size)
+# TGI (Text Generation Inference by HuggingFace) adapter
+# Endpoints: GET /info, GET /v1/models
 #
 
-adapter_provider_name() { echo "llama.cpp"; }
+adapter_provider_name() { echo "TGI"; }
 adapter_npm_package() { echo "@ai-sdk/openai-compatible"; }
-adapter_has_rich_metadata() { return 0; }  # has /props for context
+adapter_has_rich_metadata() { return 0; }  # has /info for context
 
-# Cached /props response (avoid redundant fetch)
-_LLMACPP_PROPS_CACHE=""
-
-_fetch_llamacpp_props() {
-    local url="$1"
-    if [[ -z "$_LLMACPP_PROPS_CACHE" ]]; then
-        _LLMACPP_PROPS_CACHE=$(curl -sf --connect-timeout 3 --max-time 5 "${url}/props" 2>/dev/null || echo "")
-    fi
-    echo "$_LLMACPP_PROPS_CACHE"
-}
-
-# Fetch models from llama.cpp /v1/models
 adapter_fetch_models() {
     local url="$1"
 
     local models_response
     models_response=$(curl -sf --connect-timeout 5 --max-time 10 "${url}/v1/models" 2>/dev/null)
 
-    # Get context from /props (cached)
-    local context_size=8192
-    local props_response
-    props_response=$(_fetch_llamacpp_props "$url")
-    if [[ -n "$props_response" ]]; then
+    # Try to get context from /info
+    local context_size=4096
+    local info_response
+    info_response=$(curl -sf --connect-timeout 3 --max-time 5 "${url}/info" 2>/dev/null)
+    if [[ -n "$info_response" ]]; then
         local ctx
-        ctx=$(echo "$props_response" | python3 -c "
+        ctx=$(echo "$info_response" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
-    gs = data.get('default_generation_settings', {})
-    print(gs.get('context_size', 8192))
+    print(data.get('max_input_length', data.get('max_total_tokens', 4096)))
 except:
-    print(8192)
+    print(4096)
 " 2>/dev/null)
         if [[ -n "$ctx" && "$ctx" -gt 0 ]]; then
             context_size="$ctx"
@@ -51,7 +38,6 @@ except:
         return 1
     fi
 
-    # Convert to normalized format
     echo "$models_response" | python3 -c "
 import sys, json
 
@@ -78,22 +64,21 @@ try:
         })
     print(json.dumps({'models': result}))
 except Exception as e:
-    print(f'WARN: llama_cpp parse error: {e}', file=sys.stderr)
+    print(f'WARN: tgi parse error: {e}', file=sys.stderr)
     print(json.dumps({'models': []}))
 " 2>/dev/null || echo '{"models": []}'
 }
 
 adapter_get_context() {
     local url="$1"
-    local props_response
-    props_response=$(_fetch_llamacpp_props "$url")
-    if [[ -n "$props_response" ]]; then
-        echo "$props_response" | python3 -c "
+    local info_response
+    info_response=$(curl -sf --connect-timeout 3 --max-time 5 "${url}/info" 2>/dev/null)
+    if [[ -n "$info_response" ]]; then
+        echo "$info_response" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
-    gs = data.get('default_generation_settings', {})
-    print(gs.get('context_size', ''))
+    print(data.get('max_input_length', data.get('max_total_tokens', '')))
 except:
     pass
 " 2>/dev/null

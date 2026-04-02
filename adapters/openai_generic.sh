@@ -6,7 +6,6 @@
 #
 
 adapter_provider_name() { echo "OpenAI-compatible"; }
-adapter_default_port() { echo "8000"; }
 adapter_npm_package() { echo "@ai-sdk/openai-compatible"; }
 adapter_has_rich_metadata() { return 1; }  # false — no rich metadata
 

@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 
 # ============================================================================
 # Defaults
@@ -17,6 +17,7 @@ VERSION="1.1.0"
 DEFAULT_OLLAMA="${OLLAMA_HOST:-http://localhost:11434}"
 DEFAULT_OUTPUT="opencode.json"
 DEFAULT_NUM_CTX=0
+DEFAULT_MAX_OUTPUT=16384
 CACHE_TTL=86400  # 24 hours in seconds
 
 LOCAL_URL="$DEFAULT_OLLAMA"
@@ -25,6 +26,7 @@ LOCAL_PROVIDER=""
 REMOTE_PROVIDERS=()
 OUTPUT_FILE="$DEFAULT_OUTPUT"
 NUM_CTX="$DEFAULT_NUM_CTX"
+MAX_OUTPUT="$DEFAULT_MAX_OUTPUT"
 DRY_RUN=false
 INTERACTIVE=false
 NO_EMBED=true
@@ -32,13 +34,28 @@ NO_CONTEXT_LOOKUP=false
 INCLUDE_PATTERNS=()
 EXCLUDE_PATTERNS=()
 MERGE=false
+FORCE=false
+DIFF=false
+NO_COLOR=false
+QUIET=false
+CHECK_FILE=""
 DEFAULT_MODEL=""
 SMALL_MODEL=""
+MAX_SIZE=""
+MIN_SIZE=""
+SORT_BY=""
+LIMIT_N=""
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/opencode-generator"
 
 # ============================================================================
 # Colors
 # ============================================================================
+
+_setup_colors() {
+    if [[ "$NO_COLOR" == true ]] || ! [[ -t 2 ]]; then
+        RED='' GREEN='' YELLOW='' CYAN='' BOLD='' DIM='' NC=''
+    fi
+}
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -48,10 +65,10 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-log_info()  { echo -e "${GREEN}[INFO]${NC} $1" >&2; }
+log_info()  { [[ "$QUIET" == true ]] && return; echo -e "${GREEN}[INFO]${NC} $1" >&2; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
-log_step()  { echo -e "${CYAN}[STEP]${NC} $1" >&2; }
+log_step()  { [[ "$QUIET" == true ]] && return; echo -e "${CYAN}[STEP]${NC} $1" >&2; }
 
 # ============================================================================
 # Usage
@@ -76,10 +93,20 @@ OPTIONS:
         --with-embed         Include embedding models (excluded by default)
         --no-context-lookup  Skip /api/show calls, use hardcoded context limits
         --num-ctx N          num_ctx for Ollama models, 0 to omit (default: 0)
+        --max-output N       Max output tokens cap (default: 16384)
         --merge              Merge into existing opencode.json (update models only)
+        --force              Overwrite output file without prompting
+        --diff               Show diff between old and new config (with --merge)
         --default-model ID   Set default model explicitly (e.g. qwen2.5-coder:7b)
         --small-model ID     Set small model explicitly (for title generation)
+        --max-size SIZE      Exclude models larger than SIZE (e.g. 7B, 13B)
+        --min-size SIZE      Exclude models smaller than SIZE (e.g. 1B)
+        --sort ORDER         Sort models: name, size, family (default: api order)
+        --limit N            Limit output to N models
         --no-cache           Disable context lookup cache
+        --no-color           Disable colored output
+        --quiet              Suppress non-error output
+        --check FILE         Validate an existing opencode.json file
     -v, --version            Show version
     -h, --help               Show this help
 
@@ -187,9 +214,55 @@ parse_args() {
                 NUM_CTX="$2"
                 shift 2
                 ;;
+            --max-output)
+                [[ -n "${2:-}" ]] || { log_error "--max-output requires a number"; exit 1; }
+                MAX_OUTPUT="$2"
+                shift 2
+                ;;
             --merge)
                 MERGE=true
                 shift
+                ;;
+            --force)
+                FORCE=true
+                shift
+                ;;
+            --diff)
+                DIFF=true
+                shift
+                ;;
+            --max-size)
+                [[ -n "${2:-}" ]] || { log_error "--max-size requires a SIZE (e.g. 7B)"; exit 1; }
+                MAX_SIZE="$2"
+                shift 2
+                ;;
+            --min-size)
+                [[ -n "${2:-}" ]] || { log_error "--min-size requires a SIZE (e.g. 1B)"; exit 1; }
+                MIN_SIZE="$2"
+                shift 2
+                ;;
+            --sort)
+                [[ -n "${2:-}" ]] || { log_error "--sort requires ORDER: name|size|family"; exit 1; }
+                SORT_BY="$2"
+                shift 2
+                ;;
+            --limit)
+                [[ -n "${2:-}" ]] || { log_error "--limit requires a number"; exit 1; }
+                LIMIT_N="$2"
+                shift 2
+                ;;
+            --no-color)
+                NO_COLOR=true
+                shift
+                ;;
+            --quiet)
+                QUIET=true
+                shift
+                ;;
+            --check)
+                [[ -n "${2:-}" ]] || { log_error "--check requires a file path"; exit 1; }
+                CHECK_FILE="$2"
+                shift 2
                 ;;
             --default-model)
                 [[ -n "${2:-}" ]] || { log_error "--default-model requires a model ID"; exit 1; }
@@ -257,6 +330,20 @@ check_dependencies() {
         done
         exit 1
     fi
+
+    # Validate numeric arguments
+    if ! [[ "$NUM_CTX" =~ ^[0-9]+$ ]]; then
+        log_error "--num-ctx must be a non-negative integer, got: $NUM_CTX"
+        exit 1
+    fi
+    if ! [[ "$MAX_OUTPUT" =~ ^[0-9]+$ ]]; then
+        log_error "--max-output must be a non-negative integer, got: $MAX_OUTPUT"
+        exit 1
+    fi
+    if [[ -n "$LIMIT_N" ]] && ! [[ "$LIMIT_N" =~ ^[0-9]+$ ]]; then
+        log_error "--limit must be a positive integer, got: $LIMIT_N"
+        exit 1
+    fi
 }
 
 # Validate URL format
@@ -321,8 +408,8 @@ try:
         if 'context_length' in k:
             print(v)
             break
-except:
-    pass
+except Exception as e:
+    print(f'WARN: failed to parse context response: {e}', file=sys.stderr)
 " 2>/dev/null || echo ""
 }
 
@@ -362,37 +449,56 @@ fetch_context_lengths_batch() {
         fi
     fi
 
-    # Determine which models need fetching
-    local to_fetch=()
-    local result_from_cache="{"
-    local cache_first=true
+    # Determine which models need fetching (batch lookup in single python3 call)
+    local cache_result
+    cache_result=$(export MODELS_LIST="${models[*]}"
+        echo "$cached" | python3 -c "
+import os, sys, json
 
-    for model in "${models[@]}"; do
-        local cached_ctx
-        cached_ctx=$(echo "$cached" | python3 -c "
-import sys, json
+cached = {}
 try:
-    d = json.load(sys.stdin)
-    v = d.get('${model}', None)
-    print(v if v else '')
+    cached = json.load(sys.stdin)
 except:
     pass
-" 2>/dev/null || echo "")
 
-        if [[ -n "$cached_ctx" ]]; then
-            if [[ "$cache_first" == true ]]; then
-                cache_first=false
-            else
-                result_from_cache+=", "
-            fi
-            result_from_cache+="\"${model}\": ${cached_ctx}"
-        else
-            to_fetch+=("$model")
-        fi
-    done
+models = os.environ.get('MODELS_LIST', '').split()
+cached_out = {}
+to_fetch = []
+
+for m in models:
+    v = cached.get(m)
+    if v:
+        cached_out[m] = v
+    else:
+        to_fetch.append(m)
+
+print(json.dumps({'cached': cached_out, 'to_fetch': to_fetch}))
+" 2>/dev/null || echo '{"cached":{},"to_fetch":[]}')
+
+    local result_from_cache="{"
+    local cache_first=true
+    local -a to_fetch
+
+    # Parse batch result
+    local cached_json to_fetch_json
+    cached_json=$(echo "$cache_result" | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin).get('cached',{})))" 2>/dev/null || echo "{}")
+    to_fetch_json=$(echo "$cache_result" | python3 -c "import sys,json; print(' '.join(json.load(sys.stdin).get('to_fetch',[])))" 2>/dev/null || echo "")
+
+    read -ra to_fetch <<< "$to_fetch_json"
+
+    # Build cache result string from batch lookup
+    if [[ "$cached_json" != "{}" ]]; then
+        result_from_cache=$(echo "$cached_json" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+parts = [f'\"{k}\": {v}' for k, v in d.items()]
+print('{' + ', '.join(parts) + '}')
+" 2>/dev/null || echo "{")
+        cache_first=false
+    fi
 
     if [[ ${#to_fetch[@]} -gt 0 ]]; then
-        log_step "Fetching context lengths for ${#to_fetch[@]} models (${#models[@] - ${#to_fetch[@]}} cached)..." >&2
+        log_step "Fetching context lengths for ${#to_fetch[@]} models ($(( ${#models[@]} - ${#to_fetch[@]} )) cached)..." >&2
     else
         log_step "Using cached context lengths for all ${#models[@]} models" >&2
     fi
@@ -440,12 +546,13 @@ except:
 import sys, json
 try:
     new_data = json.load(sys.stdin)
-except:
+except Exception as e:
+    print(f'WARN: cache parse error: {e}', file=sys.stderr)
     new_data = {}
 try:
     with open('${cache_file}', 'r') as f:
         old_data = json.load(f)
-except:
+except Exception:
     old_data = {}
 old_data.update(new_data)
 with open('${cache_file}', 'w') as f:
@@ -530,7 +637,7 @@ for i, m in enumerate(models, 1):
     echo -ne "${BOLD}Select models (comma-separated, e.g. 1,3,5 or 0 for all) [0]: ${NC}" >&2
 
     local selection
-    read -r selection
+    read -r selection </dev/tty
 
     # Empty or 0 = all
     if [[ -z "$selection" || "$selection" == "0" ]]; then
@@ -583,6 +690,7 @@ print(json.dumps([models[i]['name'] for i in indices]))
 generate_config() {
     export CONFIG_SERVERS_JSON="$1"
     export CONFIG_NUM_CTX="$NUM_CTX"
+    export CONFIG_MAX_OUTPUT="$MAX_OUTPUT"
     export CONFIG_OUTPUT_FILE="$OUTPUT_FILE"
     export CONFIG_DRY_RUN="$DRY_RUN"
     export CONFIG_NO_EMBED="$NO_EMBED"
@@ -591,8 +699,14 @@ generate_config() {
     export CONFIG_INCLUDE_PATTERNS="${INCLUDE_PATTERNS[*]:-}"
     export CONFIG_EXCLUDE_PATTERNS="${EXCLUDE_PATTERNS[*]:-}"
     export CONFIG_MERGE="$MERGE"
+    export CONFIG_FORCE="$FORCE"
+    export CONFIG_DIFF="$DIFF"
     export CONFIG_DEFAULT_MODEL="$DEFAULT_MODEL"
     export CONFIG_SMALL_MODEL="$SMALL_MODEL"
+    export CONFIG_MAX_SIZE="$MAX_SIZE"
+    export CONFIG_MIN_SIZE="$MIN_SIZE"
+    export CONFIG_SORT_BY="$SORT_BY"
+    export CONFIG_LIMIT_N="$LIMIT_N"
 
     python3 <<'PYEOF'
 import os
@@ -603,6 +717,7 @@ from collections import OrderedDict
 
 servers_json = os.environ.get("CONFIG_SERVERS_JSON", "[]")
 num_ctx = int(os.environ.get("CONFIG_NUM_CTX", "0"))
+max_output = int(os.environ.get("CONFIG_MAX_OUTPUT", "16384"))
 output_file = os.environ.get("CONFIG_OUTPUT_FILE", "opencode.json")
 dry_run = os.environ.get("CONFIG_DRY_RUN", "false") == "true"
 no_embed = os.environ.get("CONFIG_NO_EMBED", "true") == "true"
@@ -611,8 +726,14 @@ ctx_maps_str = os.environ.get("CONFIG_CTX_MAPS", "{}")
 include_str = os.environ.get("CONFIG_INCLUDE_PATTERNS", "").strip()
 exclude_str = os.environ.get("CONFIG_EXCLUDE_PATTERNS", "").strip()
 merge_mode = os.environ.get("CONFIG_MERGE", "false") == "true"
+force_mode = os.environ.get("CONFIG_FORCE", "false") == "true"
+diff_mode = os.environ.get("CONFIG_DIFF", "false") == "true"
 default_model = os.environ.get("CONFIG_DEFAULT_MODEL", "").strip()
 small_model_override = os.environ.get("CONFIG_SMALL_MODEL", "").strip()
+max_size_str = os.environ.get("CONFIG_MAX_SIZE", "").strip()
+min_size_str = os.environ.get("CONFIG_MIN_SIZE", "").strip()
+sort_by = os.environ.get("CONFIG_SORT_BY", "").strip()
+limit_n = os.environ.get("CONFIG_LIMIT_N", "").strip()
 
 include_patterns = include_str.split() if include_str else []
 exclude_patterns = exclude_str.split() if exclude_str else []
@@ -620,12 +741,39 @@ exclude_patterns = exclude_str.split() if exclude_str else []
 EMBED_KEYWORDS = {"nomic-bert", "bert", "bert-moe", "embed", "embedding", "jina-embeddings"}
 
 HARDCODED_CONTEXT = {
-    "qwen": 32768, "llama": 8192, "mistral": 32768, "mixtral": 32768,
-    "deepseek": 65536, "gemma": 8192, "phi": 4096, "command": 131072,
-    "yi": 200000, "codestral": 32768, "command-r": 131072, "granite": 8192,
-    "internlm": 32768, "falcon": 8192, "orca": 4096, "neural-chat": 4096,
-    "starcoder": 8192, "codegemma": 8192,
+    "qwen3": 131072, "qwen2.5": 131072, "qwen2": 32768, "qwen": 32768,
+    "llama3": 131072, "llama2": 4096, "llama": 131072,
+    "mistral": 32768, "mixtral": 32768, "mistral-nemo": 131072,
+    "deepseek-r1": 131072, "deepseek-v3": 131072, "deepseek": 65536,
+    "gemma2": 8192, "gemma": 8192,
+    "phi4": 16384, "phi3": 131072, "phi": 4096,
+    "command-a": 131072, "command-r-plus": 131072, "command-r": 131072, "command": 131072,
+    "yi": 200000, "codestral": 32768,
+    "granite3": 131072, "granite": 8192,
+    "internlm2": 32768, "internlm": 32768,
+    "falcon": 8192, "orca": 4096, "neural-chat": 4096,
+    "starcoder2": 16384, "starcoder": 8192, "codegemma": 8192,
+    "nemotron": 131072, "jamba": 256000, "aya": 131072,
+    "exaone": 32768, "glm": 131072, "minicpm": 32768,
 }
+
+def parse_param_size(param_str):
+    """Parse '3.6B', '475.29M' etc. into a number."""
+    try:
+        ps = param_str.upper().strip()
+        mult = 1
+        if "B" in ps:
+            mult = 1_000_000_000
+        elif "M" in ps:
+            mult = 1_000_000
+        val = float(ps.replace("B", "").replace("M", "").strip())
+        return val * mult
+    except (ValueError, AttributeError):
+        return float("inf")
+
+max_size = parse_param_size(max_size_str) if max_size_str else float("inf")
+min_size = parse_param_size(min_size_str) if min_size_str else 0
+limit_count = int(limit_n) if limit_n.isdigit() else 0
 
 # --- Helpers ---
 
@@ -641,9 +789,10 @@ def is_embed_model(families, name=""):
 
 def get_hardcoded_context(family):
     fl = family.lower()
-    for key, ctx in HARDCODED_CONTEXT.items():
+    # Sort by key length descending for more specific matches first (e.g. "llama3" before "llama")
+    for key in sorted(HARDCODED_CONTEXT.keys(), key=len, reverse=True):
         if key in fl:
-            return ctx
+            return HARDCODED_CONTEXT[key]
     return 8192
 
 def matches_include(name):
@@ -653,20 +802,6 @@ def matches_include(name):
 
 def matches_exclude(name):
     return any(fnmatch.fnmatch(name, p) for p in exclude_patterns)
-
-def parse_param_size(param_str):
-    """Parse '3.6B', '475.29M' etc. into a number."""
-    try:
-        ps = param_str.upper().strip()
-        mult = 1
-        if "B" in ps:
-            mult = 1_000_000_000
-        elif "M" in ps:
-            mult = 1_000_000
-        val = float(ps.replace("B", "").replace("M", "").strip())
-        return val * mult
-    except (ValueError, AttributeError):
-        return float("inf")
 
 # --- Process models from servers ---
 
@@ -693,6 +828,12 @@ def process_models(server_data, ctx_map):
         if matches_exclude(name):
             continue
 
+        # Size filtering
+        if param_size:
+            ps = parse_param_size(param_size)
+            if ps > max_size or ps < min_size:
+                continue
+
         if not no_ctx_lookup and name in ctx_map and ctx_map[name]:
             context_length = int(ctx_map[name])
             ctx_source = "api"
@@ -714,7 +855,7 @@ def process_models(server_data, ctx_map):
             "name": display_name,
             "limit": {
                 "context": context_length,
-                "output": min(context_length, 16384),
+                "output": min(context_length, max_output),
             },
             "_info": {
                 "name": name, "display": display_name, "family": family,
@@ -816,6 +957,28 @@ if not all_models:
     print("  - Check include/exclude patterns", file=sys.stderr)
     if no_embed:
         print("  - Try --with-embed to include embedding models", file=sys.stderr)
+
+# --- Sort ---
+if sort_by == "name":
+    all_models = OrderedDict(sorted(all_models.items(), key=lambda x: x[0]))
+elif sort_by == "size":
+    all_models = OrderedDict(sorted(all_models.items(), key=lambda x: parse_param_size(x[1].get("_info", {}).get("param_size", ""))))
+elif sort_by == "family":
+    all_models = OrderedDict(sorted(all_models.items(), key=lambda x: x[1].get("_info", {}).get("family", "")))
+
+# --- Limit ---
+if limit_count > 0 and len(all_models) > limit_count:
+    print(f"Limit: keeping {limit_count} of {len(all_models)} models", file=sys.stderr)
+    limited = OrderedDict()
+    for i, (k, v) in enumerate(all_models.items()):
+        if i >= limit_count:
+            break
+        limited[k] = v
+    all_models = limited
+    # Also filter server_model_maps to stay in sync
+    allowed_names = set(all_models.keys())
+    for pd in server_model_maps.values():
+        pd["models"] = OrderedDict((k, v) for k, v in pd["models"].items() if k in allowed_names)
 
 # --- Merge with existing config ---
 
@@ -964,6 +1127,29 @@ except Exception as e:
     sys.exit(1)
 
 # Output
+# Diff mode: show differences before output/file write
+if diff_mode and existing:
+    import difflib
+    existing_str = json.dumps(existing, indent=2, ensure_ascii=False)
+    print("=== DIFF: old → new ===", file=sys.stderr)
+    old_lines = existing_str.splitlines()
+    new_lines = json_str.splitlines()
+    diff = difflib.unified_diff(old_lines, new_lines, fromfile="old", tofile="new", lineterm="")
+    has_diff = False
+    for line in diff:
+        has_diff = True
+        if line.startswith("+") and not line.startswith("+++"):
+            print(f"\033[32m{line}\033[0m", file=sys.stderr)
+        elif line.startswith("-") and not line.startswith("---"):
+            print(f"\033[31m{line}\033[0m", file=sys.stderr)
+        elif line.startswith("@@"):
+            print(f"\033[36m{line}\033[0m", file=sys.stderr)
+        else:
+            print(line, file=sys.stderr)
+    if not has_diff:
+        print("No changes.", file=sys.stderr)
+    print("", file=sys.stderr)
+
 if dry_run or output_file == "-":
     print(json_str)
 else:
@@ -1028,23 +1214,110 @@ PYEOF
 
 main() {
     parse_args "$@"
+    _setup_colors
     check_dependencies
+
+    # --check mode: validate existing config
+    if [[ -n "$CHECK_FILE" ]]; then
+        if [[ ! -f "$CHECK_FILE" ]]; then
+            log_error "File not found: $CHECK_FILE"
+            exit 1
+        fi
+        export CONFIG_CHECK_FILE="$CHECK_FILE"
+        python3 -c "
+import os, sys, json
+check_file = os.environ.get('CONFIG_CHECK_FILE', '')
+try:
+    with open(check_file, 'r') as f:
+        config = json.load(f)
+    errors = []
+    if '\$schema' not in config:
+        errors.append('Missing \$schema')
+    if 'provider' not in config:
+        errors.append('Missing provider')
+    if 'model' not in config:
+        errors.append('Missing model')
+    if 'provider' in config:
+        for pid, pdata in config['provider'].items():
+            if 'models' not in pdata:
+                errors.append(f'Provider {pid} has no models')
+            if 'options' not in pdata or 'baseURL' not in pdata.get('options', {}):
+                errors.append(f'Provider {pid} missing baseURL')
+    model_ref = config.get('model', '')
+    if '/' in model_ref:
+        prov_id, model_id = model_ref.split('/', 1)
+        if prov_id in config.get('provider', {}):
+            if model_id not in config['provider'][prov_id].get('models', {}):
+                errors.append(f'Default model {model_ref} not found in provider models')
+    if errors:
+        print(f'INVALID: {check_file}', file=sys.stderr)
+        for e in errors:
+            print(f'  - {e}', file=sys.stderr)
+        sys.exit(1)
+    else:
+        model_count = sum(len(p.get('models', {})) for p in config.get('provider', {}).values())
+        print(f'VALID: {check_file} ({model_count} models, {len(config.get(\"provider\", {}))} providers)')
+except json.JSONDecodeError as e:
+    print(f'INVALID JSON: {e}', file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f'ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+"
+        exit $?
+    fi
 
     # Load adapters base
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     source "${script_dir}/adapters/base.sh"
 
-    echo -e "${CYAN}========================================${NC}" >&2
-    echo -e "${CYAN}  OpenCode Config Generator${NC}" >&2
-    echo -e "${CYAN}========================================${NC}" >&2
-    echo "" >&2
+    if [[ "$QUIET" == false ]]; then
+        echo -e "${CYAN}========================================${NC}" >&2
+        echo -e "${CYAN}  OpenCode Config Generator${NC}" >&2
+        echo -e "${CYAN}========================================${NC}" >&2
+        echo "" >&2
+    fi
 
     # Validate URLs
     validate_url "$LOCAL_URL" || exit 1
     for rurl in "${REMOTE_URLS[@]}"; do
         validate_url "$rurl" || exit 1
     done
+
+    # Early write permission check
+    if [[ "$DRY_RUN" == false && "$OUTPUT_FILE" != "-" ]]; then
+        local out_dir
+        out_dir="$(dirname "$OUTPUT_FILE")"
+        if [[ ! -d "$out_dir" ]]; then
+            log_error "Output directory does not exist: $out_dir"
+            exit 1
+        fi
+        if [[ -f "$OUTPUT_FILE" && ! -w "$OUTPUT_FILE" ]]; then
+            log_error "Output file is not writable: $OUTPUT_FILE"
+            exit 1
+        fi
+        if [[ ! -w "$out_dir" ]]; then
+            log_error "Output directory is not writable: $out_dir"
+            exit 1
+        fi
+        # Check --force for existing files
+        if [[ -f "$OUTPUT_FILE" && "$FORCE" == false && "$MERGE" == false ]]; then
+            if [[ -t 0 ]]; then
+                log_warn "File already exists: $OUTPUT_FILE"
+                echo -ne "${BOLD}Overwrite? (y/N): ${NC}" >&2
+                local confirm
+                read -r confirm </dev/tty
+                if [[ "$confirm" != [yY] ]]; then
+                    log_info "Aborted."
+                    exit 0
+                fi
+            else
+                log_error "File already exists: $OUTPUT_FILE (use --force to overwrite)"
+                exit 1
+            fi
+        fi
+    fi
 
     # Auto-detect providers if not specified
     if [[ -z "$LOCAL_PROVIDER" ]]; then
@@ -1130,8 +1403,8 @@ import sys, json
 try:
     d = json.load(sys.stdin)
     print(' '.join(m['name'] for m in d.get('models', [])))
-except:
-    pass
+except Exception as e:
+    print(f'WARN: failed to parse model names: {e}', file=sys.stderr)
 " 2>/dev/null || echo "")
 
     # Fetch context lengths (only if adapter supports it)
