@@ -43,7 +43,7 @@ $ErrorActionPreference = "Stop"
 # Defaults
 # ============================================================================
 
-$ScriptVersion = "1.4.1"
+$ScriptVersion = "1.4.2"
 $CacheTTL = 86400  # 24 hours
 
 if (-not $LocalOllamaUrl) {
@@ -844,7 +844,7 @@ if ($Limit -gt 0 -and $allModels.Count -gt $Limit) {
     $allModels = $limited
 }
 
-# Build provider config
+# Build provider config — one provider per server (each has its own baseURL)
 $providerConfig = [ordered]@{}
 
 $clean = {
@@ -856,49 +856,48 @@ $clean = {
     return $c
 }
 
-# Determine first provider type from servers
-$firstProvType = if ($allServers.Count -gt 0) { $allServers[0].provider } else { "ollama" }
-$firstProvDisplay = if ($ProviderDisplay.ContainsKey($firstProvType)) { $ProviderDisplay[$firstProvType] } else { $firstProvType }
-
-if ($allServers.Count -eq 1) {
-    $providerConfig[$firstProvType] = [ordered]@{
-        "npm"     = "@ai-sdk/openai-compatible"
-        "name"    = $firstProvDisplay
-        "options" = (Make-ProviderOptions -Url $allServers[0].url)
-        "models"  = [ordered]@{}
-    }
-    foreach ($k in $allModels.Keys) {
-        $providerConfig[$firstProvType]["models"][$k] = & $clean $allModels[$k]
-    }
+# Group servers by provider type
+$provGroups = @{}
+foreach ($srv in $allServers) {
+    $prov = $srv.provider
+    if (-not $provGroups.ContainsKey($prov)) { $provGroups[$prov] = @() }
+    $provGroups[$prov] += $srv
 }
-else {
-    $combined = [ordered]@{}
-    foreach ($pdata in $serverModelMaps.Values) {
-        foreach ($mid in $pdata.models.Keys) {
-            $combined[$mid] = & $clean $pdata.models[$mid]
+
+# Create one provider per server
+foreach ($prov in $provGroups.Keys) {
+    $serverList = $provGroups[$prov]
+    $provDisplay = if ($ProviderDisplay.ContainsKey($prov)) { $ProviderDisplay[$prov] } else { $prov }
+
+    for ($i = 0; $i -lt $serverList.Count; $i++) {
+        $srv = $serverList[$i]
+
+        # Provider key: single server = "ollama", multiple = "ollama", "ollama-2", ...
+        if ($serverList.Count -eq 1) {
+            $provKey = $prov
+        } else {
+            $provKey = if ($i -eq 0) { $prov } else { "$prov-$($i + 1)" }
         }
-    }
-    
-    $providerConfig[$firstProvType] = [ordered]@{
-        "npm"     = "@ai-sdk/openai-compatible"
-        "name"    = $firstProvDisplay
-        "options" = (Make-ProviderOptions -Url $allServers[0].url)
-        "models"  = $combined
-    }
-    
-    foreach ($pid in $serverModelMaps.Keys) {
-        if ($pid -eq $firstProvType) { continue }
-        $pdata = $serverModelMaps[$pid]
-        $pm = [ordered]@{}
-        foreach ($k in $pdata.models.Keys) {
-            $pm[$k] = & $clean $pdata.models[$k]
+
+        $displayName = if ($serverList.Count -gt 1) { "$provDisplay ($($srv.label))" } else { $provDisplay }
+
+        # Collect models for this specific server
+        $serverModels = [ordered]@{}
+        foreach ($pdata in $serverModelMaps.Values) {
+            if ($pdata.url -eq $srv.url) {
+                foreach ($mid in $pdata.models.Keys) {
+                    $serverModels[$mid] = & $clean $pdata.models[$mid]
+                }
+            }
         }
-        $provDisplay = if ($ProviderDisplay.ContainsKey($pdata.provider)) { $ProviderDisplay[$pdata.provider] } else { $pdata.provider }
-        $providerConfig[$pid] = [ordered]@{
+
+        if ($serverModels.Count -eq 0) { continue }
+
+        $providerConfig[$provKey] = [ordered]@{
             "npm"     = "@ai-sdk/openai-compatible"
-            "name"    = "$provDisplay ($($pdata.label))"
-            "options" = (Make-ProviderOptions -Url $pdata.url)
-            "models"  = $pm
+            "name"    = $displayName
+            "options" = (Make-ProviderOptions -Url $srv.url)
+            "models"  = $serverModels
         }
     }
 }
@@ -954,14 +953,39 @@ if ($smallModel -eq $firstModel) {
 }
 
 # Build final config
-$firstProvId = if ($providerConfig.Count -gt 0) { $providerConfig.Keys | Select-Object -First 1 } else { "ollama" }
+function Find-ProviderForModel {
+    param($modelKey)
+    foreach ($provId in $providerConfig.Keys) {
+        if ($providerConfig[$provId].models.ContainsKey($modelKey)) {
+            return $provId
+        }
+    }
+    return if ($providerConfig.Count -gt 0) { $providerConfig.Keys | Select-Object -First 1 } else { "ollama" }
+}
+
+$firstProvId = Find-ProviderForModel -modelKey $firstModel
 $config = [ordered]@{
     "`$schema" = "https://opencode.ai/config.json"
     "provider" = $providerConfig
     "model"    = "$firstProvId/$firstModel"
 }
 if ($smallModel -ne $firstModel) {
-    $config["small_model"] = "$firstProvId/$smallModel"
+    $smallProvId = Find-ProviderForModel -modelKey $smallModel
+    $config["small_model"] = "$smallProvId/$smallModel"
+}
+    }
+    return if ($providerConfig.Count -gt 0) { $providerConfig.Keys | Select-Object -First 1 } else { "ollama" }
+}
+
+$firstProvId = Find-ProviderForModel -modelKey $firstModel
+$config = [ordered]@{
+    "`$schema" = "https://opencode.ai/config.json"
+    "provider" = $providerConfig
+    "model"    = "$firstProvId/$firstModel"
+}
+if ($smallModel -ne $firstModel) {
+    $smallProvId = Find-ProviderForModel -modelKey $smallModel
+    $config["small_model"] = "$smallProvId/$smallModel"
 }
 
 # Merge: load existing config and keep non-provider keys

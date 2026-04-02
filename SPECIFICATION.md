@@ -2,7 +2,7 @@
 
 ## OpenCode Config Generator for Ollama — Technical Specification
 
-**Version:** 1.4.1  
+**Version:** 1.4.2  
 **Status:** Stable  
 **License:** MIT
 

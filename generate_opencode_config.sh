@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-VERSION="1.4.1"
+VERSION="1.4.2"
 
 # ============================================================================
 # Defaults
@@ -1148,27 +1148,40 @@ for idx, server in enumerate(servers):
         provider_groups[prov] = []
     provider_groups[prov].append((idx, server))
 
-# Build one provider per provider type (combined models from same provider type)
+# Build one provider per server (each server has its own baseURL)
+# Single server: uses provider key (e.g. "ollama")
+# Multiple servers of same type: uses "ollama", "ollama-2", "ollama-3", ...
 for prov, server_list in provider_groups.items():
-    display_name = PROVIDER_DISPLAY.get(prov, prov.capitalize())
-    combined_models = OrderedDict()
-    primary_url = server_list[0][1]["url"]
+    for server_idx, (_, server) in enumerate(server_list):
+        server_url = server["url"]
+        server_label = server["label"]
 
-    for _, server in server_list:
+        # Determine provider key
+        if len(server_list) == 1:
+            prov_key = prov
+        else:
+            prov_key = prov if server_idx == 0 else f"{prov}-{server_idx + 1}"
+
+        display_name = PROVIDER_DISPLAY.get(prov, prov.capitalize())
+        if len(server_list) > 1:
+            display_name = f"{display_name} ({server_label})"
+
+        # Collect models for this specific server
+        server_models = OrderedDict()
         for pid_key, pd in server_model_maps.items():
-            if pd.get("url") == server["url"]:
+            if pd.get("url") == server_url:
                 for mid, mdata in pd["models"].items():
-                    combined_models[mid] = clean(mdata)
+                    server_models[mid] = clean(mdata)
 
-    if len(server_list) > 1:
-        display_name = f"{display_name} ({len(server_list)} servers)"
+        if not server_models:
+            continue
 
-    provider_config[prov] = {
-        "npm": "@ai-sdk/openai-compatible",
-        "name": display_name,
-        "options": make_options(primary_url),
-        "models": combined_models,
-    }
+        provider_config[prov_key] = {
+            "npm": "@ai-sdk/openai-compatible",
+            "name": display_name,
+            "options": make_options(server_url),
+            "models": server_models,
+        }
 
 # If only one provider type, use simple name
 if len(provider_config) == 1:
@@ -1236,11 +1249,19 @@ else:
     config["$schema"] = "https://opencode.ai/config.json"
 
 config["provider"] = provider_config
-# Determine provider prefix for model reference
-first_provider = next(iter(provider_config), "ollama")
-config["model"] = f"{first_provider}/{first_model}"
+
+# Find which provider owns a given model
+def find_provider_for_model(model_key):
+    for prov_id, prov_data in provider_config.items():
+        if model_key in prov_data.get("models", {}):
+            return prov_id
+    return next(iter(provider_config), "ollama")
+
+first_prov = find_provider_for_model(first_model)
+config["model"] = f"{first_prov}/{first_model}"
 if small_model != first_model:
-    config["small_model"] = f"{first_provider}/{small_model}"
+    small_prov = find_provider_for_model(small_model)
+    config["small_model"] = f"{small_prov}/{small_model}"
 
 # Merge: keep other top-level keys from existing
 if existing:

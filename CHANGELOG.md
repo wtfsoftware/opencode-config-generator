@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.2] - 2026-04-03
+
+### Fixed
+- Each server now gets its own provider entry with correct `baseURL`, instead of combining all servers of the same type into one provider (fixes models from remote servers being unreachable)
+- `model` and `small_model` now reference the correct provider ID that actually owns the model
+
+## [1.4.2] - 2026-04-03
+
+### Fixed
+- Each server now gets its own provider entry with correct `baseURL`, instead of combining all servers of the same type into one provider (fixes models from remote servers being unreachable)
+- `model` and `small_model` now reference the correct provider ID that actually owns the model
+
 ## [1.4.1] - 2026-04-03
 
 ### Fixed
