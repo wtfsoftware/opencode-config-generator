@@ -43,7 +43,7 @@ $ErrorActionPreference = "Stop"
 # Defaults
 # ============================================================================
 
-$ScriptVersion = "1.4.0"
+$ScriptVersion = "1.4.1"
 $CacheTTL = 86400  # 24 hours
 
 if (-not $LocalOllamaUrl) {
@@ -789,6 +789,7 @@ foreach ($name in @($modelSources.Keys)) {
                 $suffixDisplay = if ($suffixedName -match "@") { $suffixedName.Split("@", 2)[1] } else { "" }
                 $baseName = $info.display -replace " \([^)]+\)$", ""
                 $modelData["name"] = "$baseName ($suffixDisplay)"
+                $modelData["id"] = $name
 
                 $pd.models.Remove($name)
                 $pd.models[$suffixedName] = $modelData

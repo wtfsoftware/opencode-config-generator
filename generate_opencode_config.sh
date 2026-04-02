@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-VERSION="1.4.0"
+VERSION="1.4.1"
 
 # ============================================================================
 # Defaults
@@ -1067,6 +1067,7 @@ for name in model_sources:
                     info = model_data["_info"]
                     suffix_display = suffixed_name.split("@", 1)[1] if "@" in suffixed_name else ""
                     model_data["name"] = f'{info["display"].rsplit(" (", 1)[0]} ({suffix_display})'
+                    model_data["id"] = name  # original name for API calls
 
                     # Rename in server_model_maps (for provider_config)
                     del pd["models"][name]

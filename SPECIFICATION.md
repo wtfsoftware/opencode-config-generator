@@ -2,7 +2,7 @@
 
 ## OpenCode Config Generator for Ollama — Technical Specification
 
-**Version:** 1.4.0  
+**Version:** 1.4.1  
 **Status:** Stable  
 **License:** MIT
 
@@ -175,6 +175,10 @@ Server URL → detect_provider() → load_adapter() → adapter_fetch_models()
             "context": 32768,                      // max context window
             "output": 16384                        // max output (--max-output, default 16K)
           }
+          // "id": "original-model:tag"            // only for deduplicated models (@host:port suffix)
+        }
+      }
+          // "id": "original-model:tag"            // only for deduplicated models (@host:port suffix)
         }
       }
     },
@@ -204,6 +208,10 @@ server3 (remote): qwen2.5-coder:7b                → qwen2.5-coder:7b@gpu:11434
 ```
 
 Suffix format: `@hostname:port` or `@hostname:port-N` for same-host duplicates.
+
+Deduplicated models include an `"id"` field with the original model name (without suffix), so the provider API receives the correct model identifier.
+
+Deduplicated models include an `"id"` field with the original model name (without suffix), so the provider API receives the correct model identifier.
 
 ---
 

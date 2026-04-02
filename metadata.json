@@ -1,5 +1,5 @@
 {
-  "version": "1.3.0",
+  "version": "1.4.1",
   "embed_keywords": ["nomic-bert", "bert", "bert-moe", "embed", "embedding", "jina-embeddings"],
   "hardcoded_context": {
     "qwen3": 131072,

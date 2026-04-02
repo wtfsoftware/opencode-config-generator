@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.1] - 2026-04-03
+
+### Fixed
+- Added `"id"` field to deduplicated model entries (with `@host:port` suffix) containing the original model name, so opencode sends the correct model identifier to the Ollama API (fixes "Invalid model name" error)
+
 ## [1.4.0] - 2026-04-03
 
 ### Fixed
