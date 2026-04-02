@@ -573,9 +573,10 @@ function Process-Models {
             $ctx = Get-HardcodedContext -Family $family
         }
         
-        # Add @host:port suffix for non-local servers
-        $displayName = $name
-        if ($Label -ne "local") {
+        # Add suffix: (local) for local, @host:port for remote
+        if ($Label -eq "local") {
+            $displayName = "$name (local)"
+        } else {
             try {
                 $uri = [Uri]$ServerUrl
                 $host = $uri.Host

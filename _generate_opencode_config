@@ -1,0 +1,37 @@
+#compdef generate_opencode_config.sh
+
+# Zsh completion for generate_opencode_config.sh
+# Install: cp this file to /usr/local/share/zsh/site-functions/_generate_opencode_config
+
+_generate_opencode_config() {
+    _arguments \
+        '(-l --local)'{-l,--local}'[Local server URL]:url:_urls' \
+        '(-r --remote)'{-r,--remote}'[Remote server URL]:url:_urls' \
+        '(-p --provider)'{-p,--provider}'[Provider type]:provider:(ollama lmstudio vllm llama-cpp localai tgwui jan gpt4all openai tgi)' \
+        '(-o --output)'{-o,--output}'[Output file]:file:_files' \
+        '(-n --dry-run)'{-n,--dry-run}'[Preview without writing]' \
+        '(-i --interactive)'{-i,--interactive}'[Interactive model selection]' \
+        '--include[Include models by glob pattern]:pattern:' \
+        '--exclude[Exclude models by glob pattern]:pattern:' \
+        '--with-embed[Include embedding models]' \
+        '--no-context-lookup[Skip API context lookup]' \
+        '--num-ctx[num_ctx value]:number:(0 4096 8192 16384 32768 65536)' \
+        '--max-output[Max output tokens]:number:(4096 8192 16384 32768)' \
+        '--merge[Merge into existing config]' \
+        '--force[Overwrite without prompting]' \
+        '--diff[Show diff with merge]' \
+        '--default-model[Set default model]:model:' \
+        '--small-model[Set small model]:model:' \
+        '--max-size[Max model size]:size:(1B 3B 7B 13B 33B 70B)' \
+        '--min-size[Min model size]:size:(1B 3B 7B 13B 33B 70B)' \
+        '--sort[Sort models]:order:(name size family)' \
+        '--limit[Limit model count]:number:' \
+        '--no-cache[Disable context cache]' \
+        '--no-color[Disable colored output]' \
+        '--quiet[Suppress non-error output]' \
+        '--check[Validate config file]:file:_files' \
+        '(-v --version)'{-v,--version}'[Show version]' \
+        '(-h --help)'{-h,--help}'[Show help]'
+}
+
+_generate_opencode_config "$@"

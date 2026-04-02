@@ -970,9 +970,10 @@ def process_models(server_data, ctx_map):
             context_length = get_hardcoded_context(family)
             ctx_source = "hardcoded"
 
-        # Add @host:port suffix for non-local servers
-        display_name = name
-        if label != "local":
+        # Add suffix: (local) for local, @host:port for remote
+        if label == "local":
+            display_name = f"{name} (local)"
+        else:
             try:
                 from urllib.parse import urlparse
                 parsed = urlparse(server_data.get("url", ""))
