@@ -1,0 +1,41 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "command": {
+    "test": {
+      "description": "Build and run C++ tests",
+      "template": "Build and test the project:\n!`cmake -B build -DBUILD_TESTS=ON 2>/dev/null && cmake --build build 2>/dev/null || echo 'Build failed'`\n!`ctest --test-dir build --output-on-failure 2>/dev/null || echo 'No tests found'`\n\nFix any build errors and test failures."
+    },
+    "build": {
+      "description": "Build the JUCE plugin",
+      "template": "Build the project:\n!`cmake -B build 2>/dev/null && cmake --build build --config Release 2>/dev/null || echo 'Build failed'`\n\nFix any build errors."
+    },
+    "review": {
+      "description": "Review C++ code",
+      "template": "Review the current C++ code for:\n- Modern C++17 patterns\n- Memory management (smart pointers, RAII)\n- Performance (copy elision, move semantics)\n- JUCE framework best practices\n- Cross-platform compatibility\n- Audio/MIDI correctness\n\nSuggest specific improvements."
+    }
+  },
+
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      }
+    }
+  },
+
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "allow",
+    "skill": {
+      "*": "allow",
+      "code-review-master": "allow",
+      "testing-master": "allow",
+      "git-master": "allow"
+    }
+  }
+}

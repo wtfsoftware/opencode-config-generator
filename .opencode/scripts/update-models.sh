@@ -77,7 +77,7 @@ log_step()  { [[ "$QUIET" == true ]] && return; echo -e "${CYAN}[STEP]${NC} $1" 
 
 usage() {
     cat <<'EOF'
-Usage: generate_opencode_config.sh [OPTIONS]
+Usage: update-models.sh [OPTIONS]
 
 Generates opencode.json configuration from Ollama models.
 
@@ -114,37 +114,37 @@ OPTIONS:
 
 EXAMPLES:
     # Local Ollama only
-    generate_opencode_config.sh
+    update-models.sh
 
     # With one remote server
-    generate_opencode_config.sh -r http://192.168.1.100:11434
+    update-models.sh -r http://192.168.1.100:11434
 
     # Multiple remote servers
-    generate_opencode_config.sh -r http://gpu1:11434 -r http://gpu2:11434
+    update-models.sh -r http://gpu1:11434 -r http://gpu2:11434
 
     # Interactive selection
-    generate_opencode_config.sh -i
+    update-models.sh -i
 
     # Only qwen models, write to custom path
-    generate_opencode_config.sh --include "qwen*" -o ./my-config.json
+    update-models.sh --include "qwen*" -o ./my-config.json
 
     # Preview without writing
-    generate_opencode_config.sh -n
+    update-models.sh -n
 
     # Include embedding models
-    generate_opencode_config.sh --with-embed
+    update-models.sh --with-embed
 
     # Custom num_ctx for tool calling support (adds to provider options)
-    generate_opencode_config.sh --num-ctx 32768
+    update-models.sh --num-ctx 32768
 
     # LM Studio (auto-detected by port 1234)
-    generate_opencode_config.sh -l http://localhost:1234
+    update-models.sh -l http://localhost:1234
 
     # vLLM with explicit provider
-    generate_opencode_config.sh -l http://localhost:8000 -p vllm
+    update-models.sh -l http://localhost:8000 -p vllm
 
     # Ollama + LM Studio together
-    generate_opencode_config.sh -l http://localhost:11434 -r http://localhost:1234 -p lmstudio
+    update-models.sh -l http://localhost:11434 -r http://localhost:1234 -p lmstudio
 
 ENVIRONMENT VARIABLES:
     OLLAMA_HOST              Default local Ollama URL (used when provider is ollama)
@@ -285,7 +285,7 @@ parse_args() {
                 shift
                 ;;
             -v|--version)
-                echo "generate_opencode_config.sh v${VERSION}"
+                echo "update-models.sh v${VERSION}"
                 exit 0
                 ;;
             -h|--help)

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "command": {
+    "test": {
+      "description": "Run Go tests with coverage",
+      "template": "Run tests with coverage:\n!`go test -v -cover ./...`\n\nAnalyze failures and suggest fixes."
+    },
+    "build": {
+      "description": "Build and vet Go project",
+      "template": "Build and vet the project:\n!`go build ./...`\n!`go vet ./...`\n!`golangci-lint run 2>/dev/null || echo 'golangci-lint not installed'`\n\nFix any issues found."
+    },
+    "review": {
+      "description": "Review Go code",
+      "template": "Review the current Go code for:\n- Idiomatic Go patterns\n- Error handling\n- Concurrency issues (race conditions, goroutine leaks)\n- Interface design\n- Performance\n\nSuggest specific improvements."
+    }
+  },
+
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      }
+    }
+  },
+
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "allow",
+    "skill": {
+      "*": "allow",
+      "go-master": "allow",
+      "docker-master": "allow",
+      "kubernetes-master": "allow",
+      "monitoring-master": "allow",
+      "microservices-master": "allow",
+      "security-master": "allow",
+      "api-design-master": "allow",
+      "ci-cd-master": "allow"
+    }
+  }
+}

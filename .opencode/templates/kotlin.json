@@ -1,0 +1,41 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "command": {
+    "test": {
+      "description": "Run Android tests",
+      "template": "Run the test suite:\n!`./gradlew test 2>/dev/null || echo 'Gradle not available'`\n!`./gradlew connectedAndroidTest 2>/dev/null || echo 'No connected devices'`\n\nAnalyze results and suggest fixes."
+    },
+    "build": {
+      "description": "Build the Android app",
+      "template": "Build the project:\n!`./gradlew assembleDebug 2>/dev/null || echo 'Gradle build failed'`\n\nFix any build errors."
+    },
+    "review": {
+      "description": "Review Kotlin/Android code",
+      "template": "Review the current Kotlin code for:\n- Kotlin idioms (coroutines, flows, sealed classes)\n- Jetpack Compose best practices\n- Android lifecycle correctness\n- Security (encryption, root detection)\n- Performance (recomposition, memory)\n- P2P/crypto correctness\n\nSuggest specific improvements."
+    }
+  },
+
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      }
+    }
+  },
+
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "allow",
+    "skill": {
+      "*": "allow",
+      "mobile-master": "allow",
+      "security-master": "allow",
+      "testing-master": "allow"
+    }
+  }
+}

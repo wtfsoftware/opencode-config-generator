@@ -1,0 +1,47 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "command": {
+    "test": {
+      "description": "Run pytest with coverage",
+      "template": "Run tests:\n!`pytest -v --cov=. --cov-report=term-missing 2>/dev/null || python -m pytest -v --cov=. --cov-report=term-missing`\n\nAnalyze failures and suggest fixes."
+    },
+    "lint": {
+      "description": "Run ruff and mypy",
+      "template": "Run linters:\n!`ruff check . 2>/dev/null || echo 'ruff not installed'`\n!`mypy . 2>/dev/null || echo 'mypy not installed'`\n\nFix all issues found."
+    },
+    "typecheck": {
+      "description": "Run mypy type checking",
+      "template": "Run type checking:\n!`mypy . --strict 2>/dev/null || echo 'mypy not installed'`\n\nFix all type errors."
+    },
+    "review": {
+      "description": "Review Python code",
+      "template": "Review the current Python code for:\n- Type hints and mypy compliance\n- PEP 8 style\n- Async/await correctness\n- Error handling\n- Performance (vectorization, N+1 queries)\n- Security\n\nSuggest specific improvements."
+    }
+  },
+
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      }
+    }
+  },
+
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "allow",
+    "skill": {
+      "*": "allow",
+      "python-master": "allow",
+      "testing-master": "allow",
+      "docker-master": "allow",
+      "security-master": "allow",
+      "api-design-master": "allow"
+    }
+  }
+}

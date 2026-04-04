@@ -1,0 +1,37 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "command": {
+    "test": {
+      "description": "Run smoke tests",
+      "template": "Run smoke tests:\n!`bash smoke_test.sh 2>/dev/null || echo 'No smoke test found'`\n!`bash install-skills.sh --list 2>/dev/null || echo 'Install script not found'`\n\nAnalyze results and suggest fixes."
+    },
+    "review": {
+      "description": "Review shell script",
+      "template": "Review the current shell script for:\n- Bash best practices (set -euo pipefail, quoting)\n- Error handling\n- Portability (bash vs sh)\n- Security (injection, temp files)\n- Performance (subshells, external commands)\n\nSuggest specific improvements."
+    }
+  },
+
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      }
+    }
+  },
+
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "allow",
+    "skill": {
+      "*": "allow",
+      "git-master": "allow",
+      "testing-master": "allow",
+      "docs-master": "allow"
+    }
+  }
+}

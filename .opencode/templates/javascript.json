@@ -1,0 +1,48 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "command": {
+    "test": {
+      "description": "Run tests with coverage",
+      "template": "Run the test suite:\n!`npm test 2>/dev/null || echo 'No test script found'`\n\nAnalyze results and suggest improvements for failing tests."
+    },
+    "lint": {
+      "description": "Run ESLint and fix issues",
+      "template": "Run the linter:\n!`npm run lint 2>/dev/null || npx eslint . 2>/dev/null || echo 'No linter found'`\n\nFix all auto-fixable issues and suggest manual fixes for the rest."
+    },
+    "build": {
+      "description": "Build the project",
+      "template": "Build the project:\n!`npm run build 2>/dev/null || echo 'No build script found'`\n\nFix any build errors and optimize the output."
+    },
+    "review": {
+      "description": "Review JavaScript/TypeScript code",
+      "template": "Review the current code for:\n- TypeScript type safety\n- React/component best practices (if applicable)\n- Security (XSS, injection)\n- Performance (re-renders, bundle size)\n- Testing coverage\n\nSuggest specific improvements."
+    }
+  },
+
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      }
+    }
+  },
+
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "allow",
+    "skill": {
+      "*": "allow",
+      "typescript-master": "allow",
+      "react-master": "allow",
+      "testing-master": "allow",
+      "web-security-master": "allow",
+      "web-performance-master": "allow",
+      "ci-cd-master": "allow"
+    }
+  }
+}
