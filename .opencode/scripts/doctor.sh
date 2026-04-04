@@ -172,11 +172,11 @@ fi
 
 # ── Install script ──
 echo -e "${BOLD}Scripts${NC}"
-installer="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/install-skills.sh"
+installer="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/generate_opencode_config.sh"
 if [[ -f "$installer" ]]; then
-  check ok "install-skills.sh available"
+  check ok "generate_opencode_config.sh available"
 else
-  check warn "install-skills.sh not found"
+  check warn "generate_opencode_config.sh not found"
 fi
 
 # ── Summary ──

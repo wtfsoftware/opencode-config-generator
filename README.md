@@ -6,13 +6,13 @@ Complete skills ecosystem for [opencode](https://opencode.ai) — 25 skills, 10 
 
 ```bash
 # Install all skills globally (available in every project)
-./install-skills.sh --all ~/.config/opencode
+./generate_opencode_config.sh --all ~/.config/opencode
 
 # Install specific category
-./install-skills.sh --category frontend ~/.config/opencode
+./generate_opencode_config.sh --category frontend ~/.config/opencode
 
 # Install to current project
-./install-skills.sh --all .
+./generate_opencode_config.sh --all .
 ```
 
 ## What's Included
@@ -69,7 +69,7 @@ Complete skills ecosystem for [opencode](https://opencode.ai) — 25 skills, 10 
 
 | Script | Purpose |
 |--------|---------|
-| `install-skills.sh` | Install skills globally or per-project |
+| `generate_opencode_config.sh` | Install skills globally or per-project |
 | `update-config.sh` | Master updater — project config + models |
 | `update-project-config.sh` | Intelligent project config generator |
 | `update-models.sh` | Scan LLM providers, update models section |
@@ -90,7 +90,7 @@ ocskills/
 ├── README.md                        # This file
 ├── CONTRIBUTING.md                  # Contributor guide
 ├── REGISTRY.md                      # Skills catalog
-├── install-skills.sh                # Skills installer
+├── generate_opencode_config.sh                # Skills installer
 ├── docs/
 │   ├── ECOSYSTEM.md                 # Full ecosystem docs (EN)
 │   └── ECOSYSTEM.ru.md             # Full ecosystem docs (RU)
@@ -121,7 +121,7 @@ ocskills/
 Skills available in every opencode project:
 
 ```bash
-./install-skills.sh --all ~/.config/opencode
+./generate_opencode_config.sh --all ~/.config/opencode
 ```
 
 ### Per-Project
@@ -129,21 +129,21 @@ Skills available in every opencode project:
 Skills available only in the current project:
 
 ```bash
-./install-skills.sh --all /path/to/project
+./generate_opencode_config.sh --all /path/to/project
 ```
 
 ### By Category
 
 ```bash
-./install-skills.sh --category frontend ~/.config/opencode
-./install-skills.sh --category backend ~/.config/opencode
-./install-skills.sh --category devops ~/.config/opencode
+./generate_opencode_config.sh --category frontend ~/.config/opencode
+./generate_opencode_config.sh --category backend ~/.config/opencode
+./generate_opencode_config.sh --category devops ~/.config/opencode
 ```
 
 ### Interactive
 
 ```bash
-./install-skills.sh
+./generate_opencode_config.sh
 ```
 
 ## Project Templates
