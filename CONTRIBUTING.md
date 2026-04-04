@@ -7,7 +7,7 @@ Thank you for contributing to the opencode skills collection!
 1. Fork the repository
 2. Create a branch: `git checkout -b skill/my-new-skill`
 3. Create your skill in `.opencode/skills/<name>/SKILL.md`
-4. Validate: `bash generate_opencode_config.sh --dry-run --skill <name> /tmp/test`
+4. Validate: `bash install-skills.sh --dry-run --skill <name> /tmp/test`
 5. Commit with conventional commits: `git commit -m "feat: add my-new-skill skill"`
 6. Push and open a PR
 
@@ -48,8 +48,8 @@ metadata:
 Run the validation script before submitting:
 
 ```bash
-bash generate_opencode_config.sh --list
-bash generate_opencode_config.sh --dry-run --all /tmp/test-project
+bash install-skills.sh --list
+bash install-skills.sh --dry-run --all /tmp/test-project
 ```
 
 Or use the CI workflow which runs automatically on PRs.
@@ -80,7 +80,7 @@ ci: add validation workflow
 .github/
 ├── workflows/       # CI/CD workflows
 └── ISSUE_TEMPLATE/  # Issue templates
-generate_opencode_config.sh    # Skills installer
+install-skills.sh    # Skills installer
 REGISTRY.md          # Skills catalog
 ```
 

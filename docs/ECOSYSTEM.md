@@ -10,7 +10,7 @@ git clone https://github.com/your-org/ocskills.git
 cd ocskills
 
 # 2. Install all skills globally
-./generate_opencode_config.sh --all ~/.config/opencode
+./install-skills.sh --all ~/.config/opencode
 
 # 3. Apply configs to your projects
 .opencode/scripts/apply-project-configs.sh
@@ -29,18 +29,18 @@ Skills are `SKILL.md` files with instructions that OpenCode discovers and loads 
 
 ```bash
 # All skills globally
-./generate_opencode_config.sh --all ~/.config/opencode
+./install-skills.sh --all ~/.config/opencode
 
 # By category
-./generate_opencode_config.sh --category frontend ~/.config/opencode
-./generate_opencode_config.sh --category backend ~/.config/opencode
-./generate_opencode_config.sh --category devops ~/.config/opencode
+./install-skills.sh --category frontend ~/.config/opencode
+./install-skills.sh --category backend ~/.config/opencode
+./install-skills.sh --category devops ~/.config/opencode
 
 # To a specific project
-./generate_opencode_config.sh --all /path/to/project
+./install-skills.sh --all /path/to/project
 
 # Interactive mode
-./generate_opencode_config.sh
+./install-skills.sh
 ```
 
 ### Frontend (6)
@@ -400,7 +400,7 @@ Pre-configured `opencode.json` for different project types.
 
 | Script | Description |
 |--------|-------------|
-| `generate_opencode_config.sh` | Install skills globally or per-project |
+| `install-skills.sh` | Install skills globally or per-project |
 | `update-config.sh` | Master updater — project config + models |
 | `update-project-config.sh` | Intelligent project config generator |
 | `update-models.sh` | Scan LLM providers, update models section |
@@ -523,7 +523,7 @@ ocskills/
 ├── README.md                        # Root documentation
 ├── CONTRIBUTING.md                  # Contributor guide
 ├── REGISTRY.md                      # Skills catalog
-├── generate_opencode_config.sh                # Skills installer
+├── install-skills.sh                # Skills installer
 ├── docs/
 │   └── ECOSYSTEM.md                 # Full ecosystem documentation
 ├── .opencode/
