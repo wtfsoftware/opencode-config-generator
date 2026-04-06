@@ -985,6 +985,8 @@ def process_models(server_data, ctx_map):
                 display_name = f"{name} ({label})"
 
         has_tools = supports_tools(m)
+        if has_tools:
+            display_name = f"{display_name} (T)"
         model_entry = {
             "name": display_name,
             "limit": {

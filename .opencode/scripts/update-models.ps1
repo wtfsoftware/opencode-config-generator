@@ -549,6 +549,9 @@ function Process-Models {
         if (Test-MatchesExclude -Name $name -Patterns $Exclude) { continue }
         if ($ToolsOnly -and -not (Test-IsToolCapable -Model $m)) { continue }
         
+        # Check tooling support
+        $hasTooling = Test-IsToolCapable -Model $m
+        
         # Size filtering
         if ($paramSize -and ($MaxSize -or $MinSize)) {
             $ps = Parse-ParamSize -ParamStr $paramSize
@@ -610,15 +613,21 @@ function Process-Models {
             $ctx = Get-HardcodedContext -Family $family
         }
         
+        # Add (T) suffix for tooling-capable models
+        $displayName = $name
+        if ($hasTooling) {
+            $displayName = "$name (T)"
+        }
+        
         $result[$name] = [ordered]@{
-            "name"  = $name
+            "name"  = $displayName
             "limit" = [ordered]@{
                 "context" = $ctx
                 "output"  = [Math]::Min($ctx, $MaxOutput)
             }
             "_info" = [ordered]@{
                 "name"         = $name
-                "display"      = $name
+                "display"      = $displayName
                 "family"       = $family
                 "param_size"   = $paramSize
                 "quantization" = $quant
@@ -626,6 +635,7 @@ function Process-Models {
                 "ctx_source"   = $ctxSource
                 "server_label" = $Label
                 "server_url"   = $ServerUrl
+                "tooling"      = $hasTooling
             }
         }
     }

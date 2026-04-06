@@ -52,5 +52,15 @@
     "tgwui": 5000,
     "jan": 1337,
     "gpt4all": 4891
-  }
+  },
+  "tooling": [
+    "qwen2.5", "qwen2.5-coder", "qwen3", "qwen3-coder",
+    "llama3", "llama3.1", "llama3.2", "llama3.3",
+    "mistral", "mistral-nemo", "mixtral",
+    "deepseek-r1", "deepseek-v3",
+    "command-r", "command-r-plus", "command-a",
+    "phi3", "phi4",
+    "gemma2", "gemma3",
+    "granite3", "granite3.1", "granite3.2"
+  ]
 }
