@@ -1069,13 +1069,13 @@ if limit_count > 0 and len(all_models) > limit_count:
 
 # --- Merge with existing config ---
 
-if merge_mode and os.path.exists(output_file):
+if os.path.exists(output_file):
     try:
         with open(output_file, "r", encoding="utf-8") as f:
             existing = json.load(f, object_pairs_hook=OrderedDict)
-        print(f"Merge: loading existing config from {output_file}", file=sys.stderr)
+        print(f"Loading existing config from {output_file}", file=sys.stderr)
     except Exception as e:
-        print(f"Merge: could not read existing config: {e}", file=sys.stderr)
+        print(f"Could not read existing config: {e}", file=sys.stderr)
         existing = None
 else:
     existing = None
@@ -1220,7 +1220,7 @@ if small_model != first_model:
     small_prov = find_provider_for_model(small_model)
     config["small_model"] = f"{small_prov}/{small_model}"
 
-# Merge: keep other top-level keys from existing
+# Merge: keep other top-level keys from existing (always, except provider/model/small_model)
 if existing:
     for key in existing:
         if key not in config:
