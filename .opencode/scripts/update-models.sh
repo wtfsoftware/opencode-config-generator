@@ -984,7 +984,8 @@ def process_models(server_data, ctx_map):
             except Exception:
                 display_name = f"{name} ({label})"
 
-        result[name] = {
+        has_tools = supports_tools(m)
+        model_entry = {
             "name": display_name,
             "limit": {
                 "context": context_length,
@@ -995,8 +996,12 @@ def process_models(server_data, ctx_map):
                 "param_size": param_size, "quantization": quant,
                 "context": context_length, "ctx_source": ctx_source,
                 "server_label": label, "server_url": server_data.get("url", ""),
+                "supports_tools": has_tools,
             },
         }
+        if has_tools:
+            model_entry["options"] = {"tool_calling": True, "json_mode": True}
+        result[name] = model_entry
 
     return result
 
