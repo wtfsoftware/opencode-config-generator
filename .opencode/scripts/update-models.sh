@@ -1147,14 +1147,6 @@ if len(provider_config) == 1:
     prov = next(iter(provider_config))
     provider_config[prov]["name"] = PROVIDER_DISPLAY.get(prov, prov.capitalize())
 
-# --- Merge: keep other providers from existing config ---
-
-if existing and isinstance(existing.get("provider"), dict):
-    for prov_id, prov_data in existing["provider"].items():
-        if prov_id not in provider_config:
-            provider_config[prov_id] = prov_data
-            print(f"Merge: kept existing provider '{prov_id}'", file=sys.stderr)
-
 # --- Default model ---
 
 if default_model:
@@ -1221,12 +1213,6 @@ config["model"] = f"{first_prov}/{first_model}"
 if small_model != first_model:
     small_prov = find_provider_for_model(small_model)
     config["small_model"] = f"{small_prov}/{small_model}"
-
-# Merge: keep other top-level keys from existing (always, except provider/model/small_model)
-if existing:
-    for key in existing:
-        if key not in config:
-            config[key] = existing[key]
 
 # Validate
 try:
